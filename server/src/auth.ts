@@ -1,7 +1,7 @@
 import type { NextFunction, Request, Response } from 'express'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
-import { findUserById } from './db.js'
+import { store } from './db.js'
 
 // In production set JWT_SECRET in the environment. The fallback keeps dev frictionless.
 const SECRET = process.env.JWT_SECRET || 'oneview-dev-secret-change-me'
@@ -17,13 +17,13 @@ export interface AuthedRequest extends Request {
 }
 
 /** Express middleware: require a valid Bearer token; attaches req.userId. */
-export function requireAuth(req: AuthedRequest, res: Response, next: NextFunction) {
+export async function requireAuth(req: AuthedRequest, res: Response, next: NextFunction) {
   const header = req.headers.authorization
   const token = header?.startsWith('Bearer ') ? header.slice(7) : null
   if (!token) return res.status(401).json({ error: 'Not authenticated' })
   try {
     const payload = jwt.verify(token, SECRET) as { sub: string }
-    if (!findUserById(payload.sub)) return res.status(401).json({ error: 'Unknown user' })
+    if (!(await store.findUserById(payload.sub))) return res.status(401).json({ error: 'Unknown user' })
     req.userId = payload.sub
     next()
   } catch {

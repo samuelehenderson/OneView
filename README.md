@@ -57,21 +57,23 @@ A `render.yaml` blueprint is included. In production the Express server honours 
    git push -u origin main
    ```
 2. In Render: **New → Blueprint**, pick the repo. It reads `render.yaml` and provisions a
-   web service with an auto-generated `JWT_SECRET`.
+   web service **plus a free PostgreSQL database**, with an auto-generated `JWT_SECRET` and
+   `DATABASE_URL` wired in automatically.
 3. Deploy. First build runs `npm install && npm run build`, then `npm start`.
 
-**The committed `render.yaml` targets Render's FREE tier.** That means:
-- **No persistence** — the database and uploaded floor plans sit on an ephemeral disk and
-  are **wiped on every deploy/restart**. Accounts/projects/uploads won't survive a redeploy.
-- The service **sleeps after ~15 min idle** and takes ~30s to wake.
+**Persistence:** the web service's filesystem is ephemeral (wiped on deploy/restart/sleep),
+so all data — accounts, projects, and uploaded floor plans — lives in **PostgreSQL**. The
+backend uses Postgres whenever `DATABASE_URL` is set and falls back to a JSON file for local
+dev. The free web service still **sleeps after ~15 min idle** (~30s cold start), but your
+data is safe across restarts and redeploys.
 
-To make data persist (on a paid Starter ~$7/mo), add a persistent disk — see the commented
-block at the top of `render.yaml`: re-add `plan: starter`, the `DATA_DIR=/data` env var, and
-the `disk:` block, then redeploy. For free persistence instead, migrate the store in
-`server/src/db.ts` to Render's free PostgreSQL (and store uploads in the DB or object storage).
+**Database longevity:** Render's *free* Postgres is free only for a limited window (see
+Render's pricing). For a database that stays free indefinitely, create one at
+[Neon](https://neon.tech) or [Supabase](https://supabase.com) and set `DATABASE_URL` to its
+connection string (remove the `databases:` block from `render.yaml`).
 
-Env vars (set by the blueprint): `JWT_SECRET` (generated), `NODE_VERSION`. `PORT` is
-provided by Render.
+Env vars (set by the blueprint): `JWT_SECRET` (generated), `DATABASE_URL` (from the DB),
+`NODE_VERSION`. `PORT` is provided by Render.
 
 ### Run a production build locally
 ```bash
