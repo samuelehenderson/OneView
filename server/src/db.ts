@@ -171,5 +171,6 @@ async function pgStore(url: string): Promise<Store> {
 
 // ---- Select + initialise the backend ----------------------------------------
 
-export const store: Store = process.env.DATABASE_URL ? await pgStore(process.env.DATABASE_URL) : jsonStore()
+export const storeKind: 'postgres' | 'json' = process.env.DATABASE_URL ? 'postgres' : 'json'
+export const store: Store = storeKind === 'postgres' ? await pgStore(process.env.DATABASE_URL!) : jsonStore()
 await store.init()

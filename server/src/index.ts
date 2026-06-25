@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { dirname, extname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { store, canRead, canWrite, type Project, type Role } from './db.js'
+import { store, storeKind, canRead, canWrite, type Project, type Role } from './db.js'
 import { hashPassword, requireAuth, signToken, verifyPassword, type AuthedRequest } from './auth.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -48,7 +48,7 @@ function projectForClient(p: Project, userId: string) {
 
 // ---- Health check (used by Render) ------------------------------------------
 
-app.get('/api/health', (_req: Request, res: Response) => res.json({ ok: true }))
+app.get('/api/health', (_req: Request, res: Response) => res.json({ ok: true, store: storeKind }))
 
 // ---- Auth routes ------------------------------------------------------------
 
