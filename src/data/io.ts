@@ -256,8 +256,11 @@ export async function buildingFromUpload(file: File): Promise<Building> {
 export const TEMPLATE_CSV = `Floor,Level,Area,Scope,Discipline,Status,Progress,Contractor,Responsible,Start,Target,Turnover,Punch,Notes
 Level 1,1,Open Office,HVAC,HVAC,In Progress,60,CoolAir Mechanical,J. Smith,2026-02-01,2026-06-15,,2,Ductwork in progress
 Level 1,1,Open Office,Electrical,Electrical,In Progress,45,Voltline Electrical,A. Patel,2026-02-01,2026-06-15,,0,
+Level 1,1,Open Office,Plumbing,Plumbing,In Progress,35,FlowRight Plumbing,,2026-02-15,2026-06-15,,1,Rough-in underway
 Level 1,1,Open Office,Fire,Fire,Not Started,0,SafeGuard Fire,,2026-04-01,2026-06-20,,0,
+Level 1,1,Core,Structure,Structure,Turned Over,100,BuildCo Structures,,2025-09-01,2026-01-15,2026-01-10,0,Slab & frame complete
 Level 1,1,Meeting Room,Finishes,Finishes,Commissioning,90,Apex Interiors,,2026-03-01,2026-06-10,,3,Snagging underway
 Level 2,2,Open Office,HVAC,HVAC,Turned Over,100,CoolAir Mechanical,,2026-01-15,2026-05-01,2026-04-30,0,Handed over
+Level 2,2,Open Office,Fit-out,Fitout,In Progress,55,Apex Interiors,,2026-03-01,2026-06-15,,2,Partitions and joinery
 Level 2,2,Server Room,IT-Data,IT,On Hold,20,Integrated Controls,,2026-03-01,2026-06-20,,1,Awaiting client sign-off
 `
