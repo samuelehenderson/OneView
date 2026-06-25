@@ -56,7 +56,7 @@ const clampPct = (n: number) => Math.max(0, Math.min(100, Math.round(isFinite(n)
 // still stack correctly. Higher number = higher in the building. Returns null if unknown.
 export function deriveLevel(name: string): number | null {
   const n = name.toLowerCase()
-  if (/\b(roof|rooftop|penthouse|plant)\b/.test(n)) return 100
+  if (/\b(roof|rooftop|penthouse|ph|plant)\b/.test(n)) return 100
   const b = n.match(/\bb(?:asement)?\s*-?(\d+)\b/) // "Basement 2", "B2"
   if (b) return -Number(b[1])
   if (/\b(lower ground|basement|sub-?basement)\b/.test(n)) return -1

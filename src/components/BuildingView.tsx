@@ -5,7 +5,7 @@ import { paths } from '../api'
 
 // The top-level building exterior: floors stacked vertically, each clickable.
 export function BuildingView() {
-  const { project, building } = useStore()
+  const { project, building, canEdit, replaceBuilding } = useStore()
   const navigate = useNavigate()
 
   const W = 520
@@ -16,9 +16,26 @@ export function BuildingView() {
   const floors = [...building.floors].sort((a, b) => b.level - a.level)
   const H = padTop + floors.length * (floorH + gap) + 16
 
+  // Move a floor up/down by swapping its level with the neighbour's (forcing a gap on ties).
+  const moveFloor = (id: string, dir: 'up' | 'down') => {
+    const i = floors.findIndex((f) => f.id === id)
+    const j = dir === 'up' ? i - 1 : i + 1
+    if (j < 0 || j >= floors.length) return
+    const a = floors[i]
+    const b = floors[j]
+    const levels: Record<string, number> = {}
+    if (a.level === b.level) levels[a.id] = dir === 'up' ? b.level + 1 : b.level - 1
+    else { levels[a.id] = b.level; levels[b.id] = a.level }
+    replaceBuilding({
+      ...building,
+      floors: building.floors.map((f) => (f.id in levels ? { ...f, level: levels[f.id] } : f)),
+    })
+  }
+
   return (
     <div className="canvas">
       <div className="plan">
+        {canEdit && <div className="toolbar"><span className="sub">Use the ▲▼ arrows on each floor to reorder the stack</span></div>}
         <svg viewBox={`0 0 ${W + 80} ${H}`} role="img" aria-label="Building" preserveAspectRatio="xMidYMid meet">
           {/* Roof */}
           <polygon
@@ -47,6 +64,19 @@ export function BuildingView() {
                   {pct}%
                 </text>
                 <circle cx={40 + W - 22} cy={y + 50} r={5} fill={statusColor[st]} />
+                {/* reorder arrows (edit access only) */}
+                {canEdit && (
+                  <g style={{ cursor: 'pointer' }} onClick={(e) => e.stopPropagation()}>
+                    {i > 0 && (
+                      <text x={22} y={y + 30} textAnchor="middle" fill="var(--accent)" style={{ fontSize: 22 }}
+                        onClick={(e) => { e.stopPropagation(); moveFloor(f.id, 'up') }}>▲</text>
+                    )}
+                    {i < floors.length - 1 && (
+                      <text x={22} y={y + 56} textAnchor="middle" fill="var(--accent)" style={{ fontSize: 22 }}
+                        onClick={(e) => { e.stopPropagation(); moveFloor(f.id, 'down') }}>▼</text>
+                    )}
+                  </g>
+                )}
               </g>
             )
           })}
