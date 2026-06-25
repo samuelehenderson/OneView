@@ -37,7 +37,7 @@ export function BuildingView() {
                 <rect x={40} y={y} width={8} height={floorH} rx={4} fill={statusColor[st]} />
                 <text className="zone-label" x={56} y={y + 24}>{f.name}</text>
                 <text className="zone-sub" x={56} y={y + 40}>
-                  {f.areas.length} areas{punch > 0 ? ` · ${punch} open punch` : ''}
+                  Level {f.level} · {f.areas.length} areas{punch > 0 ? ` · ${punch} open punch` : ''}
                 </text>
                 {/* progress bar */}
                 <rect x={56} y={y + 50} width={W - 120} height={8} rx={4} fill="#0e1622" stroke="var(--border)" strokeWidth={0.5} />

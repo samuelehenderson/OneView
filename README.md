@@ -90,7 +90,26 @@ for Excel the first sheet is read. One row per work scope:
 `Floor, Level, Area, Scope, Discipline, Status, Progress, Contractor, Responsible, Start, Target, Turnover, Punch, Notes`
 
 Only `Floor`, `Area`, `Scope` are required; columns can be in any order; status/discipline
-accept friendly spellings. Floor/area layouts are generated automatically. (Tracing on an
+accept friendly spellings. Floor/area layouts are generated automatically.
+
+### Floor stacking (the `Level` column)
+
+Floors are stacked by `Level`: **higher number = higher in the building**, ground = `0`,
+basement = negative (e.g. `-1`). Put the **same number on every row of a floor**:
+
+| Floor | Level |
+| --- | --- |
+| Roof Plant | 4 |
+| Level 3 | 3 |
+| Ground | 0 |
+| Basement | -1 |
+
+If you leave `Level` blank, OneView **infers it from the floor name** — `Roof`/`Penthouse`/`Plant`
+go on top, `Ground`/`Mezzanine` = 0, `Basement 2`/`B2` = -2, and a number in the name
+(`Level 3`, `L2`, `3rd Floor`) is used directly. So well-named floors stack correctly even
+without the column. The parsed level is shown on each floor in the building view, so you can
+confirm the stacking is right. (Floors with no level and no number in the name fall back to
+the order they appear in the file.) (Tracing on an
 uploaded plan is the alternative to auto-layout when you want areas to match the real plan.)
 
 ## Project structure

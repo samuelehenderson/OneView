@@ -52,6 +52,19 @@ const normStatus = (s: string): ProgressStatus => STATUS_MAP[s.trim().toLowerCas
 const normDiscipline = (s: string): ScopeType => DISCIPLINE_MAP[s.trim().toLowerCase()] ?? 'fitout'
 const clampPct = (n: number) => Math.max(0, Math.min(100, Math.round(isFinite(n) ? n : 0)))
 
+// When the Level column is blank, infer a stacking level from the floor name so floors
+// still stack correctly. Higher number = higher in the building. Returns null if unknown.
+export function deriveLevel(name: string): number | null {
+  const n = name.toLowerCase()
+  if (/\b(roof|rooftop|penthouse|plant)\b/.test(n)) return 100
+  const b = n.match(/\bb(?:asement)?\s*-?(\d+)\b/) // "Basement 2", "B2"
+  if (b) return -Number(b[1])
+  if (/\b(lower ground|basement|sub-?basement)\b/.test(n)) return -1
+  if (/\b(ground|gf|g\/f|mezz(anine)?)\b/.test(n)) return 0
+  const m = n.match(/-?\d+/) // "Level 3", "L2", "3rd Floor", "Floor 12"
+  return m ? Number(m[0]) : null
+}
+
 // ---- CSV parsing (handles quotes, embedded commas, CRLF) ---------------------
 
 function parseCsv(text: string): string[][] {
@@ -129,15 +142,25 @@ export function buildingFromRows(rows: string[][], name = 'Imported Building', a
   }
 
   // Group rows: floor → area → scopes, preserving first-seen order.
-  const floors = new Map<string, { level: number; areas: Map<string, RawScope[]> }>()
+  // Level resolution per floor: explicit Level number → inferred from the floor name → row order.
+  const floors = new Map<string, { level: number; levelExplicit: boolean; order: number; areas: Map<string, RawScope[]> }>()
   for (const r of rows.slice(1)) {
     const floorName = get(r, 'floor')
     const areaName = get(r, 'area')
     const scopeName = get(r, 'scope')
     if (!floorName || !areaName || !scopeName) continue
     const levelRaw = get(r, 'level')
-    const level = levelRaw === '' ? floors.size : Number(levelRaw)
-    if (!floors.has(floorName)) floors.set(floorName, { level: isFinite(level) ? level : floors.size, areas: new Map() })
+    const parsed = levelRaw === '' ? NaN : Number(levelRaw)
+    const explicit = isFinite(parsed)
+    if (!floors.has(floorName)) {
+      const order = floors.size
+      const level = explicit ? parsed : deriveLevel(floorName) ?? order
+      floors.set(floorName, { level, levelExplicit: explicit, order, areas: new Map() })
+    } else {
+      // A later row may supply the explicit level the first row for this floor lacked.
+      const f = floors.get(floorName)!
+      if (!f.levelExplicit && explicit) { f.level = parsed; f.levelExplicit = true }
+    }
     const f = floors.get(floorName)!
     if (!f.areas.has(areaName)) f.areas.set(areaName, [])
     f.areas.get(areaName)!.push({
@@ -156,7 +179,8 @@ export function buildingFromRows(rows: string[][], name = 'Imported Building', a
   }
 
   const builtFloors: Floor[] = [...floors.entries()]
-    .sort((a, b) => b[1].level - a[1].level)
+    // Highest level on top; ties keep their first-seen order.
+    .sort((a, b) => b[1].level - a[1].level || a[1].order - b[1].order)
     .map(([floorName, f]) => {
       const areaEntries = [...f.areas.entries()]
       const areas: Area[] = areaEntries.map(([areaName, scopes], ai) => {
