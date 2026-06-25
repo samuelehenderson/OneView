@@ -75,8 +75,11 @@ export function Dashboard() {
   return (
     <div className="dashboard">
       <div className="dash-head">
-        <h1>{building.name}</h1>
-        <span className="sub">{building.address}</span>
+        <div>
+          <h1>{building.name}</h1>
+          <span className="sub">{building.address}</span>
+        </div>
+        <button className="btn secondary" onClick={() => navigate(paths.report(project.id))}>📄 Report</button>
       </div>
 
       <div className="kpi-row">

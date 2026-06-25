@@ -289,3 +289,31 @@ select {
 .gantt-bar { position: absolute; top: 3px; height: 16px; border-radius: 4px; min-width: 6px; overflow: hidden; display: flex; align-items: center; }
 .gantt-fill { position: absolute; left: 0; top: 0; bottom: 0; background: rgba(255,255,255,0.35); }
 .gantt-bar-pct { position: relative; font-size: 9px; color: #04121f; font-weight: 700; padding-left: 4px; white-space: nowrap; }
+
+.dash-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+
+/* Printable report (white "document") */
+.report-page { min-height: 100vh; background: #0c1018; padding: 20px; }
+.report-toolbar { max-width: 900px; margin: 0 auto 14px; display: flex; justify-content: space-between; gap: 8px; }
+.report { max-width: 900px; margin: 0 auto; background: #fff; color: #1a1a1a; padding: 40px; border-radius: 6px; }
+.report h1 { margin: 0; font-size: 26px; color: #111; }
+.report h2 { font-size: 15px; text-transform: uppercase; letter-spacing: 1px; color: #555; border-bottom: 2px solid #eee; padding-bottom: 6px; margin: 26px 0 10px; }
+.report .muted { color: #777; }
+.report-head { display: flex; justify-content: space-between; align-items: flex-start; }
+.report-meta { text-align: right; }
+.report-pct { font-size: 40px; font-weight: 800; color: #3da9fc; line-height: 1; }
+.report-gen { font-size: 12px; margin-top: 4px; }
+.report-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 8px; }
+.report-table th, .report-table td { border: 1px solid #e2e2e2; padding: 6px 9px; text-align: left; }
+.report-table th { background: #f5f7fa; color: #333; }
+.report-table.compact th, .report-table.compact td { padding: 4px 6px; font-size: 11px; }
+.report-foot { margin-top: 30px; font-size: 11px; text-align: center; border-top: 1px solid #eee; padding-top: 10px; }
+
+@media print {
+  .no-print { display: none !important; }
+  .report-page { background: #fff; padding: 0; }
+  .report { max-width: none; box-shadow: none; border-radius: 0; padding: 0; }
+  .report-table { page-break-inside: auto; }
+  .report-table tr { page-break-inside: avoid; }
+  @page { margin: 14mm; }
+}

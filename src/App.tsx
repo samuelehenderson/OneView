@@ -6,6 +6,7 @@ import { FloorView } from './components/FloorView'
 import { RoomView } from './components/RoomView'
 import { Schedule } from './components/Schedule'
 import { Timeline } from './components/Timeline'
+import { Report } from './components/Report'
 import { ProjectNav } from './components/ProjectNav'
 import { Breadcrumbs, type Crumb } from './components/Breadcrumbs'
 import { DataMenu } from './components/DataMenu'
@@ -102,6 +103,12 @@ function ProjectShell({ view }: { view: React.ReactNode }) {
   )
 }
 
+// The report stands alone (no app chrome) so it prints cleanly.
+function ReportShell() {
+  const { projectId = '' } = useParams()
+  return <ProjectProvider projectId={projectId}><Report /></ProjectProvider>
+}
+
 export default function App() {
   const { user, loading } = useAuth()
   if (loading) return <div className="empty" style={{ paddingTop: 80 }}>Loading…</div>
@@ -114,6 +121,7 @@ export default function App() {
       <Route path="/p/:projectId/building" element={<ProjectShell view={<BuildingView />} />} />
       <Route path="/p/:projectId/schedule" element={<ProjectShell view={<Schedule />} />} />
       <Route path="/p/:projectId/timeline" element={<ProjectShell view={<Timeline />} />} />
+      <Route path="/p/:projectId/report" element={<ReportShell />} />
       <Route path="/p/:projectId/floor/:floorId" element={<ProjectShell view={<FloorView />} />} />
       <Route path="/p/:projectId/floor/:floorId/area/:areaId" element={<ProjectShell view={<RoomView />} />} />
     </Routes>

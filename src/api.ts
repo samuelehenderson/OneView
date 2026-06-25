@@ -83,6 +83,7 @@ export const paths = {
   building: (pid: string) => `/p/${pid}/building`,
   schedule: (pid: string) => `/p/${pid}/schedule`,
   timeline: (pid: string) => `/p/${pid}/timeline`,
+  report: (pid: string) => `/p/${pid}/report`,
   floor: (pid: string, fid: string) => `/p/${pid}/floor/${fid}`,
   area: (pid: string, fid: string, aid: string, scopeId?: string) =>
     `/p/${pid}/floor/${fid}/area/${aid}${scopeId ? `?scope=${scopeId}` : ''}`,
