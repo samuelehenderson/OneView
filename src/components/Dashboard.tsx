@@ -13,6 +13,7 @@ const STATUS_ORDER: ProgressStatus[] = ['turned-over', 'commissioning', 'in-prog
 const DISCIPLINE_LABEL: Record<ScopeType, string> = {
   hvac: 'HVAC', electrical: 'Electrical', plumbing: 'Plumbing', fire: 'Fire & Life Safety',
   finishes: 'Finishes', structure: 'Structure', 'it-data': 'IT / Data', fitout: 'Fit-out',
+  controls: 'Controls / BMS',
 }
 
 function Kpi({ label, value, sub, color }: { label: string; value: string | number; sub?: string; color?: string }) {

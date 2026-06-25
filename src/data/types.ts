@@ -20,6 +20,7 @@ export type ScopeType =
   | 'finishes'
   | 'it-data'
   | 'fitout'
+  | 'controls'
 
 /** A punch-list (snag) item against a scope. */
 export interface PunchItem {
@@ -66,6 +67,21 @@ export interface Scope {
   /** Legacy/simple open punch count. Used when punchList is absent. */
   openPunch?: number
   notes?: string
+  // --- Controls / BACnet device info (optional; populated by the DCP importer) ---
+  /** Equipment ID, e.g. "VAV-2-1-1". */
+  equipId?: string
+  /** Associated air-handling / parent unit, e.g. "AHU-1". */
+  associatedUnit?: string
+  /** BACnet device-instance number, e.g. "268090". */
+  deviceInstance?: string
+  /** BACnet MS/TP or network address, e.g. "26805 - 1". */
+  bacnetAddress?: string
+  /** Controller application number, e.g. "15042". */
+  applicationNumber?: string
+  /** Field-panel MAC address (or "Siemens Provided"). */
+  macAddress?: string
+  /** Field-panel IP address (or "UF Provided"). */
+  ipAddress?: string
   // --- Rich detail (all optional, added incrementally) ---
   punchList?: PunchItem[]
   attachments?: Attachment[]

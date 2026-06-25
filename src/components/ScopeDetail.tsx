@@ -137,6 +137,19 @@ export function ScopeDetail({ scope, onClose }: { scope: Scope; onClose: () => v
         <Field label="Target" type="date" value={scope.targetDate ?? ''} onChange={(v) => set({ targetDate: v })} />
         <Field label="Turned Over" type="date" value={scope.turnoverDate ?? ''} onChange={(v) => set({ turnoverDate: v })} />
 
+        {(scope.type === 'controls' || scope.equipId || scope.deviceInstance || scope.macAddress) && (
+          <>
+            <h3>Controls / BACnet</h3>
+            <Field label="Equip ID" value={scope.equipId ?? ''} onChange={(v) => set({ equipId: v })} />
+            <Field label="Associated Unit" value={scope.associatedUnit ?? ''} onChange={(v) => set({ associatedUnit: v })} />
+            <Field label="Device Instance" value={scope.deviceInstance ?? ''} onChange={(v) => set({ deviceInstance: v })} />
+            <Field label="BACnet Address" value={scope.bacnetAddress ?? ''} onChange={(v) => set({ bacnetAddress: v })} />
+            <Field label="Application #" value={scope.applicationNumber ?? ''} onChange={(v) => set({ applicationNumber: v })} />
+            <Field label="MAC Address" value={scope.macAddress ?? ''} onChange={(v) => set({ macAddress: v })} />
+            <Field label="IP Address" value={scope.ipAddress ?? ''} onChange={(v) => set({ ipAddress: v })} />
+          </>
+        )}
+
         <h3>Punch List</h3>
         <PunchList items={scope.punchList ?? []} onChange={(punchList) => set({ punchList })} />
 

@@ -24,6 +24,15 @@ export const CSV_COLUMNS = [
   'Turnover',
   'Punch',
   'Notes',
+  // Controls / BACnet columns (optional; appended after Notes so existing files
+  // keep their column positions and still import cleanly).
+  'EquipID',
+  'Unit',
+  'DeviceInstance',
+  'BACnetAddress',
+  'AppNumber',
+  'MAC',
+  'IP',
 ] as const
 
 // ---- Normalisers (accept friendly spellings) --------------------------------
@@ -44,8 +53,10 @@ const DISCIPLINE_MAP: Record<string, ScopeType> = {
   plumbing: 'plumbing', plumb: 'plumbing', hydraulic: 'plumbing',
   finishes: 'finishes', finish: 'finishes', interior: 'finishes', interiors: 'finishes',
   structure: 'structure', structural: 'structure',
-  it: 'it-data', data: 'it-data', 'it-data': 'it-data', comms: 'it-data', bms: 'it-data',
+  it: 'it-data', data: 'it-data', 'it-data': 'it-data', comms: 'it-data',
   fitout: 'fitout', 'fit-out': 'fitout', 'fit out': 'fitout',
+  controls: 'controls', control: 'controls', bms: 'controls', bas: 'controls',
+  bacnet: 'controls', dcp: 'controls', ddc: 'controls', automation: 'controls',
 }
 
 const normStatus = (s: string): ProgressStatus => STATUS_MAP[s.trim().toLowerCase()] ?? 'not-started'
@@ -175,6 +186,13 @@ export function buildingFromRows(rows: string[][], name = 'Imported Building', a
       turnoverDate: get(r, 'turnover') || undefined,
       openPunch: Number(get(r, 'punch')) || 0,
       notes: get(r, 'notes') || '',
+      equipId: get(r, 'equipid') || undefined,
+      associatedUnit: get(r, 'unit') || undefined,
+      deviceInstance: get(r, 'deviceinstance') || undefined,
+      bacnetAddress: get(r, 'bacnetaddress') || undefined,
+      applicationNumber: get(r, 'appnumber') || undefined,
+      macAddress: get(r, 'mac') || undefined,
+      ipAddress: get(r, 'ip') || undefined,
     })
   }
 
@@ -199,6 +217,114 @@ export function buildingFromRows(rows: string[][], name = 'Imported Building', a
   return { id: 'bldg-import', name, address, floors: builtFloors }
 }
 
+// ---- Generic assembler: floor/area/scope groups → laid-out Building ----------
+
+interface FloorDef { name: string; level: number; areas: { name: string; scopes: RawScope[] }[] }
+
+// Lay out pre-grouped floors/areas/scopes onto the 0–100 grids and assign ids.
+function assembleBuilding(name: string, address: string, floorDefs: FloorDef[]): Building {
+  const floors: Floor[] = floorDefs.map((f) => ({
+    id: uid('fl'),
+    name: f.name,
+    level: f.level,
+    areas: f.areas.map((a, ai) => ({
+      id: uid('ar'),
+      name: a.name,
+      ...areaBox(ai, f.areas.length),
+      scopes: a.scopes.map((s, si) => ({ id: uid('sc'), ...scopePos(si, a.scopes.length), ...s })),
+    })),
+  }))
+  return { id: 'bldg-import', name, address, floors }
+}
+
+// ---- DCP (Siemens BACnet controls) workbook ---------------------------------
+//
+// A "DCP" export has two sheets: a Field Panel list (controllers — name, MAC,
+// BACnet instance, IP) and a Field Device list (VAV boxes etc. — name, equip-id,
+// associated unit, address, instance, application #). There is no floor/area or
+// progress in the data, so every record becomes a `controls` scope on a single
+// floor: devices grouped by their associated unit, panels under "Field Panels".
+
+// Read a worksheet into objects keyed by lower-cased header, dropping blank rows.
+function sheetObjects(XLSX: typeof import('xlsx'), sheet: import('xlsx').WorkSheet): Record<string, string>[] {
+  const aoa = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, raw: false, defval: '' })
+  if (aoa.length < 2) return []
+  const header = aoa[0].map((h) => String(h ?? '').trim().toLowerCase())
+  return aoa
+    .slice(1)
+    .map((r) => {
+      const o: Record<string, string> = {}
+      header.forEach((h, i) => { if (h) o[h] = String(r[i] ?? '').trim() })
+      return o
+    })
+    .filter((o) => Object.values(o).some((v) => v !== ''))
+}
+
+// Pick the first present, non-empty value among candidate header names.
+const pick = (o: Record<string, string>, ...keys: string[]) => {
+  for (const k of keys) if (o[k]) return o[k]
+  return ''
+}
+
+// True when the workbook looks like a DCP field panel / device export.
+export function isDcpWorkbook(wb: import('xlsx').WorkBook): boolean {
+  const names = wb.SheetNames.map((n) => n.toLowerCase())
+  return names.some((n) => n.includes('field panel') || n.includes('field device'))
+}
+
+export function buildingFromDcpWorkbook(
+  XLSX: typeof import('xlsx'),
+  wb: import('xlsx').WorkBook,
+  name = 'Imported Building',
+): Building {
+  const sheetByName = (frag: string) =>
+    wb.SheetNames.find((n) => n.toLowerCase().includes(frag))
+  const panelSheet = sheetByName('field panel')
+  const deviceSheet = sheetByName('field device')
+
+  const panels = panelSheet ? sheetObjects(XLSX, wb.Sheets[panelSheet]) : []
+  const devices = deviceSheet ? sheetObjects(XLSX, wb.Sheets[deviceSheet]) : []
+  if (!panels.length && !devices.length)
+    throw new Error('No Field Panel or Field Device rows found in the workbook.')
+
+  // Devices grouped by associated unit, preserving first-seen order.
+  const unitAreas = new Map<string, RawScope[]>()
+  for (const d of devices) {
+    const unit = pick(d, 'associated unit', 'unit', 'parent') || 'Unassigned'
+    if (!unitAreas.has(unit)) unitAreas.set(unit, [])
+    unitAreas.get(unit)!.push({
+      name: pick(d, 'device name', 'name', 'equip-id', 'equip id') || 'Device',
+      type: 'controls',
+      status: 'not-started',
+      progress: 0,
+      equipId: pick(d, 'equip-id', 'equip id', 'equipid') || undefined,
+      associatedUnit: pick(d, 'associated unit', 'unit') || undefined,
+      bacnetAddress: pick(d, 'address') || undefined,
+      deviceInstance: pick(d, 'device instance', 'instance', 'instance number') || undefined,
+      applicationNumber: pick(d, 'application number', 'app number', 'application') || undefined,
+      notes: pick(d, 'notes', 'note') || '',
+    })
+  }
+
+  const panelScopes: RawScope[] = panels.map((p) => ({
+    name: pick(p, 'field panel name', 'panel name', 'name') || 'Panel',
+    type: 'controls',
+    status: 'not-started',
+    progress: 0,
+    deviceInstance: pick(p, 'instance number', 'instance', 'device instance') || undefined,
+    macAddress: pick(p, 'mac address', 'mac') || undefined,
+    ipAddress: pick(p, 'ip address', 'ip') || undefined,
+    notes: pick(p, 'notes', 'note') || '',
+  }))
+
+  // One floor; "Field Panels" first, then each unit's devices.
+  const areas: FloorDef['areas'] = []
+  if (panelScopes.length) areas.push({ name: 'Field Panels', scopes: panelScopes })
+  for (const [unit, scopes] of unitAreas) areas.push({ name: unit, scopes })
+
+  return assembleBuilding(name, 'Imported', [{ name: 'Field Controls', level: 0, areas }])
+}
+
 // ---- Building → CSV (export) -------------------------------------------------
 
 function csvCell(v: string | number | undefined): string {
@@ -212,7 +338,8 @@ export function csvFromBuilding(b: Building): string {
     for (const a of f.areas)
       for (const s of a.scopes)
         lines.push(
-          [f.name, f.level, a.name, s.name, s.type, s.status, s.progress, s.contractor, s.responsible, s.startDate, s.targetDate, s.turnoverDate, s.openPunch, s.notes]
+          [f.name, f.level, a.name, s.name, s.type, s.status, s.progress, s.contractor, s.responsible, s.startDate, s.targetDate, s.turnoverDate, s.openPunch, s.notes,
+           s.equipId, s.associatedUnit, s.deviceInstance, s.bacnetAddress, s.applicationNumber, s.macAddress, s.ipAddress]
             .map(csvCell)
             .join(','),
         )
@@ -226,6 +353,8 @@ export function csvFromBuilding(b: Building): string {
 export async function buildingFromXlsx(buffer: ArrayBuffer, name = 'Imported Building'): Promise<Building> {
   const XLSX = await import('xlsx')
   const wb = XLSX.read(buffer, { type: 'array' })
+  // A Siemens DCP field-panel/device workbook has its own two-sheet shape.
+  if (isDcpWorkbook(wb)) return buildingFromDcpWorkbook(XLSX, wb, name)
   const sheet = wb.Sheets[wb.SheetNames[0]]
   if (!sheet) throw new Error('The workbook has no sheets.')
   // header:1 → array-of-arrays; defval keeps empty cells aligned; everything as strings.
