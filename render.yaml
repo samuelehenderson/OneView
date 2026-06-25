@@ -1,26 +1,30 @@
-# Render Blueprint for OneView.
+# Render Blueprint for OneView (FREE tier).
 # Deploy: push this repo to GitHub, then in Render → New → Blueprint, pick the repo.
 #
-# NOTE: the persistent disk below keeps the database + uploaded floor plans across
-# deploys/restarts and requires a paid instance (Starter). If you want to try the free
-# tier first, delete the `plan: starter` line and the whole `disk:` block and remove the
-# DATA_DIR env var — but be aware all data + uploads are then WIPED on every deploy.
+# ⚠️ FREE TIER CAVEATS:
+#  - No persistent disk: the database (server/data/db.json) and uploaded floor plans are
+#    stored on an ephemeral filesystem and are WIPED on every deploy/restart. Accounts,
+#    projects, and uploads will NOT survive a redeploy.
+#  - The service sleeps after ~15 min idle and takes ~30s to wake on the next request.
+#
+# To make data persist later (when on a paid plan), add this back and redeploy:
+#   plan: starter
+#   envVars: ... - key: DATA_DIR
+#                  value: /data
+#   disk:
+#     name: oneview-data
+#     mountPath: /data
+#     sizeGB: 1
 services:
   - type: web
     name: oneview
     runtime: node
-    plan: starter
+    plan: free
     buildCommand: npm install && npm run build
     startCommand: npm start
     healthCheckPath: /api/health
     envVars:
       - key: JWT_SECRET
         generateValue: true # Render generates a strong secret once and keeps it
-      - key: DATA_DIR
-        value: /data
       - key: NODE_VERSION
         value: "22.11.0"
-    disk:
-      name: oneview-data
-      mountPath: /data
-      sizeGB: 1

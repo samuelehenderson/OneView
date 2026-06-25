@@ -57,18 +57,21 @@ A `render.yaml` blueprint is included. In production the Express server honours 
    git push -u origin main
    ```
 2. In Render: **New → Blueprint**, pick the repo. It reads `render.yaml` and provisions a
-   web service with a **1 GB persistent disk** mounted at `/data` (where the database and
-   uploaded floor plans live) and an auto-generated `JWT_SECRET`.
+   web service with an auto-generated `JWT_SECRET`.
 3. Deploy. First build runs `npm install && npm run build`, then `npm start`.
 
-**Persistence note:** Render's normal filesystem is wiped on every deploy/restart, so the
-disk is what keeps your data. The disk requires a **paid Starter instance (~$7/mo)**. To
-try the **free** tier instead, remove the `plan: starter` line, the entire `disk:` block,
-and the `DATA_DIR` env var from `render.yaml` — but then **all projects + uploads are lost
-on each deploy**. (Free services also sleep when idle.)
+**The committed `render.yaml` targets Render's FREE tier.** That means:
+- **No persistence** — the database and uploaded floor plans sit on an ephemeral disk and
+  are **wiped on every deploy/restart**. Accounts/projects/uploads won't survive a redeploy.
+- The service **sleeps after ~15 min idle** and takes ~30s to wake.
 
-Env vars (set automatically by the blueprint): `JWT_SECRET` (generated), `DATA_DIR=/data`,
-`NODE_VERSION`. `PORT` is provided by Render.
+To make data persist (on a paid Starter ~$7/mo), add a persistent disk — see the commented
+block at the top of `render.yaml`: re-add `plan: starter`, the `DATA_DIR=/data` env var, and
+the `disk:` block, then redeploy. For free persistence instead, migrate the store in
+`server/src/db.ts` to Render's free PostgreSQL (and store uploads in the DB or object storage).
+
+Env vars (set by the blueprint): `JWT_SECRET` (generated), `NODE_VERSION`. `PORT` is
+provided by Render.
 
 ### Run a production build locally
 ```bash
