@@ -1,18 +1,12 @@
-# Render Blueprint for OneView (free tier, with a database for persistence).
+# Render Blueprint for OneView (free web service + external free Postgres).
 # Deploy: push to GitHub, then Render → New → Blueprint, pick the repo.
 #
-# Persistence: the web service's own filesystem is wiped on every deploy/restart, so
-# accounts, projects, and uploads are stored in PostgreSQL instead. This blueprint
-# provisions a FREE Postgres database and injects its DATABASE_URL into the app.
+# Persistence: the web service filesystem is wiped on every deploy/restart, so all data
+# (accounts, projects, uploaded floor plans) lives in PostgreSQL. We use a free Neon
+# database (https://neon.tech) which stays free indefinitely — set DATABASE_URL to its
+# connection string in the Render dashboard (Environment tab) after the first deploy.
 #
-# NOTE: Render's free Postgres is free for a limited time (see Render's pricing) and the
-# free web service sleeps when idle (~30s cold start). For a database that stays free
-# indefinitely, create one at Neon or Supabase and set DATABASE_URL to its connection
-# string instead of using the `databases:` block below.
-databases:
-  - name: oneview-db
-    plan: free
-
+# (Render's own free Postgres works too but expires after ~30 days; Neon/Supabase don't.)
 services:
   - type: web
     name: oneview
@@ -25,8 +19,6 @@ services:
       - key: JWT_SECRET
         generateValue: true
       - key: DATABASE_URL
-        fromDatabase:
-          name: oneview-db
-          property: connectionString
+        sync: false # set manually in the dashboard to your Neon connection string
       - key: NODE_VERSION
         value: "22.11.0"
