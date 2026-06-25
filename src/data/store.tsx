@@ -6,7 +6,7 @@ import { api, type Project } from '../api'
 export {
   areaProgress, areaStatus, floorProgress, floorStatus, buildingProgress,
   areaPunch, floorPunch, buildingPunch, scopeOpenPunch,
-  flattenScopes, statusCounts, disciplineBreakdown, totalScopes,
+  flattenScopes, statusCounts, disciplineBreakdown, totalScopes, isOverdue, overdueCount,
 } from './rollup'
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error'

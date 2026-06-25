@@ -15,6 +15,13 @@ export interface User {
   name: string
 }
 
+export interface Member {
+  id: string
+  email: string
+  name: string
+  role: 'editor' | 'viewer'
+}
+
 export interface Project {
   id: string
   name: string
@@ -25,6 +32,10 @@ export interface Project {
   createdAt: string
   updatedAt: string
   myRole: 'owner' | 'editor' | 'viewer'
+  // Present on the single-project GET (and member mutations):
+  ownerEmail?: string
+  ownerName?: string
+  memberList?: Member[]
 }
 
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
@@ -55,6 +66,8 @@ export const api = {
   deleteProject: (id: string) => req<{ ok: true }>(`/projects/${id}`, { method: 'DELETE' }),
   addMember: (id: string, email: string, role: 'editor' | 'viewer') =>
     req<{ project: Project }>(`/projects/${id}/members`, { method: 'POST', body: JSON.stringify({ email, role }) }),
+  removeMember: (id: string, userId: string) =>
+    req<{ project: Project }>(`/projects/${id}/members/${userId}`, { method: 'DELETE' }),
 
   async uploadImage(file: File): Promise<string> {
     const fd = new FormData()
@@ -69,6 +82,7 @@ export const paths = {
   project: (pid: string) => `/p/${pid}`, // dashboard / overview
   building: (pid: string) => `/p/${pid}/building`,
   schedule: (pid: string) => `/p/${pid}/schedule`,
+  timeline: (pid: string) => `/p/${pid}/timeline`,
   floor: (pid: string, fid: string) => `/p/${pid}/floor/${fid}`,
   area: (pid: string, fid: string, aid: string, scopeId?: string) =>
     `/p/${pid}/floor/${fid}/area/${aid}${scopeId ? `?scope=${scopeId}` : ''}`,

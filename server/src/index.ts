@@ -116,10 +116,22 @@ app.post('/api/projects', requireAuth, ah(async (req, res) => {
   res.json({ project: projectForClient(project, req.userId!) })
 }))
 
+// Resolve member userIds → {email,name,role} (+ owner) for the share UI.
+async function withMembers(p: Project, userId: string) {
+  const owner = await store.findUserById(p.ownerId)
+  const memberList = await Promise.all(
+    Object.entries(p.members).map(async ([id, role]) => {
+      const u = await store.findUserById(id)
+      return { id, email: u?.email ?? id, name: u?.name ?? '', role }
+    }),
+  )
+  return { ...projectForClient(p, userId), ownerEmail: owner?.email ?? '', ownerName: owner?.name ?? '', memberList }
+}
+
 app.get('/api/projects/:id', requireAuth, ah(async (req, res) => {
   const p = await store.findProject(req.params.id)
   if (!p || !canRead(p, req.userId!)) return res.status(404).json({ error: 'Project not found.' })
-  res.json({ project: projectForClient(p, req.userId!) })
+  res.json({ project: await withMembers(p, req.userId!) })
 }))
 
 // Save the building (and optionally name/address) for a project.
@@ -163,7 +175,17 @@ app.post('/api/projects/:id/members', requireAuth, ah(async (req, res) => {
   if (target.id === p.ownerId) return res.status(400).json({ error: 'That user is the owner.' })
   p.members[target.id] = (role === 'viewer' ? 'viewer' : 'editor') as Role
   await store.saveProject(p)
-  res.json({ project: projectForClient(p, req.userId!) })
+  res.json({ project: await withMembers(p, req.userId!) })
+}))
+
+// Remove a member (owner only).
+app.delete('/api/projects/:id/members/:userId', requireAuth, ah(async (req, res) => {
+  const p = await store.findProject(req.params.id)
+  if (!p) return res.status(404).json({ error: 'Project not found.' })
+  if (p.ownerId !== req.userId!) return res.status(403).json({ error: 'Only the owner can manage members.' })
+  delete p.members[req.params.userId]
+  await store.saveProject(p)
+  res.json({ project: await withMembers(p, req.userId!) })
 }))
 
 // ---- Floor-plan image upload (stored via the active backend) ----------------

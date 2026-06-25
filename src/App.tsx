@@ -5,6 +5,7 @@ import { BuildingView } from './components/BuildingView'
 import { FloorView } from './components/FloorView'
 import { RoomView } from './components/RoomView'
 import { Schedule } from './components/Schedule'
+import { Timeline } from './components/Timeline'
 import { ProjectNav } from './components/ProjectNav'
 import { Breadcrumbs, type Crumb } from './components/Breadcrumbs'
 import { DataMenu } from './components/DataMenu'
@@ -112,6 +113,7 @@ export default function App() {
       <Route path="/p/:projectId" element={<ProjectShell view={<Dashboard />} />} />
       <Route path="/p/:projectId/building" element={<ProjectShell view={<BuildingView />} />} />
       <Route path="/p/:projectId/schedule" element={<ProjectShell view={<Schedule />} />} />
+      <Route path="/p/:projectId/timeline" element={<ProjectShell view={<Timeline />} />} />
       <Route path="/p/:projectId/floor/:floorId" element={<ProjectShell view={<FloorView />} />} />
       <Route path="/p/:projectId/floor/:floorId/area/:areaId" element={<ProjectShell view={<RoomView />} />} />
     </Routes>

@@ -91,3 +91,11 @@ export function disciplineBreakdown(b: Building): { type: ScopeType; pct: number
 }
 
 export const totalScopes = (b: Building) => flattenScopes(b).length
+
+/** A scope is overdue if it has a target date in the past and isn't turned over. */
+export function isOverdue(s: Scope, today = new Date().toISOString().slice(0, 10)): boolean {
+  return !!s.targetDate && s.status !== 'turned-over' && s.targetDate < today
+}
+export function overdueCount(b: Building): number {
+  return flattenScopes(b).filter((f) => isOverdue(f.scope)).length
+}

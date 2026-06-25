@@ -7,6 +7,7 @@ export function ProjectNav({ projectId }: { projectId: string }) {
     { to: paths.project(projectId), label: 'Overview', end: true },
     { to: paths.building(projectId), label: 'Building', end: false },
     { to: paths.schedule(projectId), label: 'Schedule', end: false },
+    { to: paths.timeline(projectId), label: 'Timeline', end: false },
   ]
   return (
     <nav className="projectnav">

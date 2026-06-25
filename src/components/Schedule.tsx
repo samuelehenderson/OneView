@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore, scopeOpenPunch } from '../data/store'
-import { flattenScopes, type FlatScope } from '../data/rollup'
+import { flattenScopes, isOverdue, type FlatScope } from '../data/rollup'
 import { StatusBadge, statusColor } from './StatusBadge'
 import { paths } from '../api'
 import type { ProgressStatus } from '../data/types'
@@ -91,7 +91,9 @@ export function Schedule() {
                   <div className="mini-bar"><span style={{ width: `${f.scope.progress}%`, background: statusColor[f.scope.status] }} /></div>
                   <span className="sub">{f.scope.progress}%</span>
                 </td>
-                <td className="sub">{f.scope.targetDate || '—'}</td>
+                <td className="sub" style={isOverdue(f.scope) ? { color: 'var(--alarm)', fontWeight: 600 } : undefined}>
+                  {f.scope.targetDate || '—'}{isOverdue(f.scope) ? ' ⚠' : ''}
+                </td>
                 <td>{scopeOpenPunch(f.scope) || ''}</td>
               </tr>
             ))}

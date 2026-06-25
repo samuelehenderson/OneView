@@ -2,9 +2,10 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore, floorProgress, floorStatus } from '../data/store'
 import {
-  buildingProgress, buildingPunch, statusCounts, disciplineBreakdown, totalScopes,
+  buildingProgress, buildingPunch, statusCounts, disciplineBreakdown, totalScopes, overdueCount,
 } from '../data/rollup'
 import { statusColor, statusLabel } from './StatusBadge'
+import { Share } from './Share'
 import { api, paths } from '../api'
 import type { ProgressStatus, ScopeType } from '../data/types'
 
@@ -68,6 +69,7 @@ export function Dashboard() {
   const turnedOver = counts['turned-over']
   const onHold = counts['on-hold']
   const punch = buildingPunch(building)
+  const overdue = useMemo(() => overdueCount(building), [building])
   const floors = useMemo(() => [...building.floors].sort((a, b) => b.level - a.level), [building])
 
   return (
@@ -81,6 +83,7 @@ export function Dashboard() {
         <Kpi label="Complete" value={`${pct}%`} color="var(--accent)" sub={`${total} scopes`} />
         <Kpi label="Turned Over" value={turnedOver} color="var(--ok)" sub={`of ${total}`} />
         <Kpi label="Open Punch" value={punch} color={punch ? 'var(--warning)' : 'var(--muted)'} />
+        <Kpi label="Overdue" value={overdue} color={overdue ? 'var(--alarm)' : 'var(--muted)'} sub="past target date" />
         <Kpi label="On Hold" value={onHold} color={onHold ? 'var(--alarm)' : 'var(--muted)'} />
         <Kpi label="Floors" value={building.floors.length} />
       </div>
@@ -131,6 +134,8 @@ export function Dashboard() {
           ))}
           {disciplines.length === 0 && <div className="empty">No scopes yet.</div>}
         </section>
+
+        <Share project={project} />
       </div>
     </div>
   )
