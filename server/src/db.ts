@@ -45,6 +45,9 @@ export interface Store {
   removeProject(id: string): Promise<void>
   saveUpload(id: string, mime: string, data: Buffer): Promise<void>
   getUpload(id: string): Promise<{ mime: string; data: Buffer } | undefined>
+  /** Record/overwrite today's overall % complete for a project (for the S-curve). */
+  recordSnapshot(projectId: string, pct: number): Promise<void>
+  getHistory(projectId: string): Promise<{ day: string; pct: number }[]>
 }
 
 // ---- Pure permission helpers (operate on an already-loaded Project) ----------
@@ -62,12 +65,12 @@ const mimeFromName = (n: string) => MIME[(n.match(/\.[^.]+$/)?.[0] || '').toLowe
 
 function jsonStore(): Store {
   const DB_FILE = join(DATA_DIR, 'db.json')
-  interface Shape { users: User[]; projects: Project[] }
+  interface Shape { users: User[]; projects: Project[]; snapshots?: Record<string, { day: string; pct: number }[]> }
   const ensureDirs = () => {
     if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true })
     if (!existsSync(UPLOADS_DIR)) mkdirSync(UPLOADS_DIR, { recursive: true })
   }
-  let db: Shape = { users: [], projects: [] }
+  let db: Shape = { users: [], projects: [], snapshots: {} }
   const save = () => writeFileSync(DB_FILE, JSON.stringify(db, null, 2))
   const readFileP = promisify(readFile)
   const writeFileP = promisify(writeFile)
@@ -78,7 +81,7 @@ function jsonStore(): Store {
       if (existsSync(DB_FILE)) {
         try {
           const o = JSON.parse(readFileSync(DB_FILE, 'utf8'))
-          db = { users: o.users ?? [], projects: o.projects ?? [] }
+          db = { users: o.users ?? [], projects: o.projects ?? [], snapshots: o.snapshots ?? {} }
         } catch { /* start empty */ }
       }
       console.log('Store: JSON file at', DB_FILE)
@@ -97,6 +100,16 @@ function jsonStore(): Store {
       if (!existsSync(path)) return undefined
       return { mime: mimeFromName(id), data: await readFileP(path) }
     },
+    async recordSnapshot(projectId, pct) {
+      db.snapshots ??= {}
+      const day = new Date().toISOString().slice(0, 10)
+      const arr = (db.snapshots[projectId] ??= [])
+      const existing = arr.find((s) => s.day === day)
+      if (existing) existing.pct = pct
+      else arr.push({ day, pct })
+      save()
+    },
+    async getHistory(projectId) { return (db.snapshots?.[projectId] ?? []).slice().sort((a, b) => a.day.localeCompare(b.day)) },
   }
 }
 
@@ -127,6 +140,9 @@ async function pgStore(url: string): Promise<Store> {
         building jsonb NOT NULL, created_at text NOT NULL, updated_at text NOT NULL)`)
       await q(`CREATE TABLE IF NOT EXISTS uploads (
         id text PRIMARY KEY, mime text NOT NULL, data bytea NOT NULL, created_at timestamptz DEFAULT now())`)
+      await q(`CREATE TABLE IF NOT EXISTS progress_snapshots (
+        project_id text NOT NULL, day date NOT NULL, pct int NOT NULL,
+        PRIMARY KEY (project_id, day))`)
       console.log('Store: PostgreSQL')
     },
     async findUserByEmail(email) {
@@ -165,6 +181,15 @@ async function pgStore(url: string): Promise<Store> {
     async getUpload(id) {
       const { rows } = await q('SELECT mime,data FROM uploads WHERE id=$1', [id])
       return rows[0] ? { mime: rows[0].mime, data: rows[0].data as Buffer } : undefined
+    },
+    async recordSnapshot(projectId, pct) {
+      await q(`INSERT INTO progress_snapshots (project_id, day, pct) VALUES ($1, CURRENT_DATE, $2)
+               ON CONFLICT (project_id, day) DO UPDATE SET pct = EXCLUDED.pct`, [projectId, Math.round(pct)])
+    },
+    async getHistory(projectId) {
+      const { rows } = await q(`SELECT to_char(day,'YYYY-MM-DD') AS day, pct FROM progress_snapshots
+                                WHERE project_id=$1 ORDER BY day`, [projectId])
+      return rows.map((r: any) => ({ day: r.day, pct: r.pct }))
     },
   }
 }

@@ -4,7 +4,9 @@ import { api, type Project } from '../api'
 
 // Re-export the pure roll-up helpers so existing views keep importing from here.
 export {
-  areaProgress, areaStatus, floorProgress, floorStatus, buildingProgress, areaPunch, floorPunch,
+  areaProgress, areaStatus, floorProgress, floorStatus, buildingProgress,
+  areaPunch, floorPunch, buildingPunch, scopeOpenPunch,
+  flattenScopes, statusCounts, disciplineBreakdown, totalScopes,
 } from './rollup'
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error'

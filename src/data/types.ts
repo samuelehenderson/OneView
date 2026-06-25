@@ -21,6 +21,31 @@ export type ScopeType =
   | 'it-data'
   | 'fitout'
 
+/** A punch-list (snag) item against a scope. */
+export interface PunchItem {
+  id: string
+  text: string
+  done: boolean
+  createdAt: string
+}
+
+/** An uploaded photo or document attached to a scope. */
+export interface Attachment {
+  id: string
+  url: string
+  name: string
+  /** 'image' renders as a thumbnail; 'file' as a link. */
+  kind: 'image' | 'file'
+}
+
+/** A dated comment on a scope. */
+export interface Comment {
+  id: string
+  text: string
+  author: string
+  at: string
+}
+
 /** A single tracked work item within an area (e.g. "HVAC", "Electrical fit-out"). */
 export interface Scope {
   id: string
@@ -38,9 +63,13 @@ export interface Scope {
   startDate?: string
   targetDate?: string
   turnoverDate?: string
-  /** Number of open punch-list items. */
+  /** Legacy/simple open punch count. Used when punchList is absent. */
   openPunch?: number
   notes?: string
+  // --- Rich detail (all optional, added incrementally) ---
+  punchList?: PunchItem[]
+  attachments?: Attachment[]
+  comments?: Comment[]
 }
 
 export interface Area {

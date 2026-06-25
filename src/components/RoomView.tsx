@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { useStore } from '../data/store'
 import { statusColor } from './StatusBadge'
 import { ScopeDetail } from './ScopeDetail'
@@ -8,8 +8,10 @@ import { ScopeDetail } from './ScopeDetail'
 // with its percent complete shown. Click one to view/edit its imported info.
 export function RoomView() {
   const { floorId = '', areaId = '' } = useParams()
+  const [searchParams] = useSearchParams()
   const { building } = useStore()
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  // ?scope=<id> (e.g. from the Schedule table) opens that scope's panel on arrival.
+  const [selectedId, setSelectedId] = useState<string | null>(searchParams.get('scope'))
 
   const floor = building.floors.find((f) => f.id === floorId)
   const area = floor?.areas.find((a) => a.id === areaId)

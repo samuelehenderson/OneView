@@ -25,6 +25,13 @@ Browser (React + TS, Vite)  ──/api──▶  Express backend  ──▶  JSO
 - **Accounts** — register / sign in; projects are private to you and people you share with
 - **Multiple projects** — project list with per-project % complete; create / open / delete
 - **Sharing & roles** — owner can add members as `editor` or `viewer` (view-only locks editing)
+- **Project dashboard** — overall % complete, status breakdown, by-floor & by-discipline
+  progress, open-punch/turned-over KPIs, and an **S-curve** of progress over time
+- **Schedule view** — a sortable, filterable table of every scope in the building
+  (by status, discipline, or text), with click-through to the scope and CSV export of the view
+- **Per-scope detail** — punch list (real items, not just a count), **photo attachments**,
+  a **comments timeline**, progress %, status, contractor, and turnover dates
+- **Tabbed navigation** — Overview / Building / Schedule, with deep-links to a scope
 - **Drill-down** — building → floor → area → scope, with breadcrumbs, search, and status roll-up
 - **Floor-plan upload + tracing** — upload an image per floor, then drag rectangles to trace
   clickable areas over it (rename / delete in edit mode)

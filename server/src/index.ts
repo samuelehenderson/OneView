@@ -37,6 +37,15 @@ function newBuilding(name: string, address: string) {
   }
 }
 
+// Overall % complete of a building (average of every scope's progress) — for snapshots.
+function buildingPct(building: any): number {
+  const ps: number[] = []
+  for (const f of building?.floors ?? [])
+    for (const a of f.areas ?? [])
+      for (const s of a.scopes ?? []) ps.push(Number(s.progress) || 0)
+  return ps.length ? Math.round(ps.reduce((x, y) => x + y, 0) / ps.length) : 0
+}
+
 // Strip server-only fields and add the caller's role for the client.
 function projectForClient(p: Project, userId: string) {
   return {
@@ -124,7 +133,15 @@ app.put('/api/projects/:id', requireAuth, ah(async (req, res) => {
   if (address !== undefined) p.address = String(address)
   p.updatedAt = new Date().toISOString()
   await store.saveProject(p)
+  if (building !== undefined) await store.recordSnapshot(p.id, buildingPct(p.building)).catch(() => {})
   res.json({ project: projectForClient(p, req.userId!) })
+}))
+
+// Progress history (S-curve) for a project.
+app.get('/api/projects/:id/history', requireAuth, ah(async (req, res) => {
+  const p = await store.findProject(req.params.id)
+  if (!p || !canRead(p, req.userId!)) return res.status(404).json({ error: 'Project not found.' })
+  res.json({ history: await store.getHistory(p.id) })
 }))
 
 app.delete('/api/projects/:id', requireAuth, ah(async (req, res) => {

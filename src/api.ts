@@ -49,6 +49,7 @@ export const api = {
   createProject: (name: string, address: string) =>
     req<{ project: Project }>('/projects', { method: 'POST', body: JSON.stringify({ name, address }) }),
   getProject: (id: string) => req<{ project: Project }>(`/projects/${id}`),
+  getHistory: (id: string) => req<{ history: { day: string; pct: number }[] }>(`/projects/${id}/history`),
   saveProject: (id: string, patch: { building?: Building; name?: string; address?: string }) =>
     req<{ project: Project }>(`/projects/${id}`, { method: 'PUT', body: JSON.stringify(patch) }),
   deleteProject: (id: string) => req<{ ok: true }>(`/projects/${id}`, { method: 'DELETE' }),
@@ -65,7 +66,10 @@ export const api = {
 
 // ---- Route path helpers ------------------------------------------------------
 export const paths = {
-  project: (pid: string) => `/p/${pid}`,
+  project: (pid: string) => `/p/${pid}`, // dashboard / overview
+  building: (pid: string) => `/p/${pid}/building`,
+  schedule: (pid: string) => `/p/${pid}/schedule`,
   floor: (pid: string, fid: string) => `/p/${pid}/floor/${fid}`,
-  area: (pid: string, fid: string, aid: string) => `/p/${pid}/floor/${fid}/area/${aid}`,
+  area: (pid: string, fid: string, aid: string, scopeId?: string) =>
+    `/p/${pid}/floor/${fid}/area/${aid}${scopeId ? `?scope=${scopeId}` : ''}`,
 }
