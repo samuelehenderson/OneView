@@ -29,7 +29,7 @@ Browser (React + TS, Vite)  ──/api──▶  Express backend  ──▶  JSO
 - **Floor-plan upload + tracing** — upload an image per floor, then drag rectangles to trace
   clickable areas over it (rename / delete in edit mode)
 - **Editable turnover info** — progress %, status, contractor, dates, punch items, notes
-- **CSV / JSON import + export** — bulk-load a whole building from a spreadsheet (see below)
+- **Excel / CSV / JSON import + export** — bulk-load a whole building from a spreadsheet (see below)
 - **Auto-save** — every change is saved to the backend (debounced); a status shows "Saving…/Saved"
 
 ## Run it (development)
@@ -84,7 +84,8 @@ For larger multi-user scale later, swap the JSON store in `server/src/db.ts` for
 ## Importing your data
 
 Toolbar → **Template** downloads `oneview-template.csv`; fill it in (Excel / Sheets) and
-**Import**. One row per work scope:
+**Import**. Import accepts **Excel (`.xlsx`/`.xls`), `.csv`, or a OneView `.json` export** —
+for Excel the first sheet is read. One row per work scope:
 
 `Floor, Level, Area, Scope, Discipline, Status, Progress, Contractor, Responsible, Start, Target, Turnover, Punch, Notes`
 

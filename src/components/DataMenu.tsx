@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../data/store'
 import { paths } from '../api'
-import { buildingFromFile, csvFromBuilding, TEMPLATE_CSV } from '../data/io'
+import { buildingFromUpload, csvFromBuilding, TEMPLATE_CSV } from '../data/io'
 
 function download(filename: string, text: string, mime: string) {
   const blob = new Blob([text], { type: mime })
@@ -27,7 +27,7 @@ export function DataMenu() {
 
   const onFile = async (file: File) => {
     try {
-      const next = buildingFromFile(file.name, await file.text())
+      const next = await buildingFromUpload(file)
       // Preserve the project's own name/address; only the floors are imported.
       next.name = building.name
       next.address = building.address
@@ -42,7 +42,9 @@ export function DataMenu() {
 
   return (
     <div className="datamenu">
-      <input ref={fileInput} type="file" accept=".csv,.json,text/csv,application/json" style={{ display: 'none' }}
+      <input ref={fileInput} type="file"
+        accept=".csv,.json,.xlsx,.xls,text/csv,application/json,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        style={{ display: 'none' }}
         onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = '' }} />
       {canEdit && <button className="btn" onClick={() => fileInput.current?.click()}>Import</button>}
       <button className="btn secondary" onClick={() => download('oneview-template.csv', TEMPLATE_CSV, 'text/csv')}>Template</button>

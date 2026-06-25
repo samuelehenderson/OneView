@@ -111,14 +111,18 @@ const uid = (p: string) => `${p}-${Date.now().toString(36)}-${++seq}`
 interface RawScope extends Omit<Scope, 'id' | 'x' | 'y'> {}
 
 export function buildingFromCsv(text: string, name = 'Imported Building', address = 'Imported'): Building {
-  const rows = parseCsv(text)
-  if (rows.length < 2) throw new Error('CSV is empty or has no data rows.')
+  return buildingFromRows(parseCsv(text), name, address)
+}
+
+// Shared by CSV and XLSX: takes a header row + data rows (already split into cells).
+export function buildingFromRows(rows: string[][], name = 'Imported Building', address = 'Imported'): Building {
+  if (rows.length < 2) throw new Error('File is empty or has no data rows.')
 
   // Map header names to indices (case-insensitive), so column order can vary.
   const header = rows[0].map((h) => h.trim().toLowerCase())
   const col = (k: string) => header.indexOf(k.toLowerCase())
   const need = ['floor', 'area', 'scope']
-  for (const k of need) if (col(k) === -1) throw new Error(`CSV is missing required column "${k}".`)
+  for (const k of need) if (col(k) === -1) throw new Error(`Missing required column "${k}" (need Floor, Area, Scope).`)
   const get = (r: string[], k: string) => {
     const i = col(k)
     return i === -1 ? '' : (r[i] ?? '').trim()
@@ -191,16 +195,36 @@ export function csvFromBuilding(b: Building): string {
   return lines.join('\n')
 }
 
-// ---- Detect & dispatch -------------------------------------------------------
+// ---- XLSX (Excel) ------------------------------------------------------------
 
-export function buildingFromFile(filename: string, text: string): Building {
-  if (filename.toLowerCase().endsWith('.json')) {
+// Parse the first sheet of an .xlsx/.xls workbook into rows, then reuse buildingFromRows.
+// SheetJS is loaded on demand so it stays out of the initial bundle.
+export async function buildingFromXlsx(buffer: ArrayBuffer, name = 'Imported Building'): Promise<Building> {
+  const XLSX = await import('xlsx')
+  const wb = XLSX.read(buffer, { type: 'array' })
+  const sheet = wb.Sheets[wb.SheetNames[0]]
+  if (!sheet) throw new Error('The workbook has no sheets.')
+  // header:1 → array-of-arrays; defval keeps empty cells aligned; everything as strings.
+  const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, raw: false, defval: '' })
+  const stringRows = rows.map((r) => r.map((c) => (c == null ? '' : String(c))))
+  return buildingFromRows(stringRows, name)
+}
+
+// ---- Detect & dispatch (reads the File itself) -------------------------------
+
+export async function buildingFromUpload(file: File): Promise<Building> {
+  const base = file.name.replace(/\.[^.]+$/, '') || 'Imported Building'
+  const lower = file.name.toLowerCase()
+  if (lower.endsWith('.xlsx') || lower.endsWith('.xls')) {
+    return buildingFromXlsx(await file.arrayBuffer(), base)
+  }
+  const text = await file.text()
+  if (lower.endsWith('.json')) {
     const obj = JSON.parse(text)
     if (!obj || !Array.isArray(obj.floors)) throw new Error('JSON is not a OneView building (missing "floors").')
     return obj as Building
   }
-  const base = filename.replace(/\.[^.]+$/, '')
-  return buildingFromCsv(text, base || 'Imported Building')
+  return buildingFromCsv(text, base)
 }
 
 // ---- Starter template --------------------------------------------------------
