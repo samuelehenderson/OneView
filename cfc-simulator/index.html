@@ -30,6 +30,39 @@
   .btn.run{background:#143b2a; border-color:var(--ok)}
   .btn.stop{background:#3b1414; border-color:var(--bad)}
   .sep{width:1px; height:22px; background:var(--line); margin:0 4px}
+  .tabs{display:flex; gap:2px; margin-right:8px}
+  .tab{background:transparent; color:var(--dim); border:1px solid transparent; border-bottom:none;
+    padding:5px 12px; border-radius:6px 6px 0 0; cursor:pointer; font-size:12px; position:relative; top:1px}
+  .tab small{color:#5d6878}
+  .tab.active{background:var(--panel2); color:var(--ink); border-color:var(--line)}
+  .tab.active small{color:var(--accent)}
+
+  /* ---- PPCL panel ---- */
+  #ppclPanel{grid-column:1 / 4; grid-row:2; display:none; min-height:0;
+    grid-template-columns:1.3fr 280px; grid-template-rows:1fr 150px; gap:1px; background:var(--line)}
+  #ppclPanel.show{display:grid}
+  .ppcl-edit{grid-row:1 / 3; background:var(--bg); display:flex; flex-direction:column; min-height:0}
+  .ppcl-bar{display:flex; align-items:center; gap:8px; padding:6px 10px; background:var(--panel);
+    border-bottom:1px solid var(--line); font-size:12px; color:var(--dim)}
+  #ppclCode{flex:1; width:100%; resize:none; border:none; outline:none; padding:10px 12px;
+    background:#0c1118; color:#cfe3ff; font:12px/1.55 "SFMono-Regular",Consolas,"Liberation Mono",monospace;
+    tab-size:4; white-space:pre; overflow:auto}
+  .ppcl-points{background:var(--panel); overflow:auto; padding:8px}
+  .ppcl-points h3{font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:var(--dim); margin:2px 0 8px}
+  .pt-row{display:grid; grid-template-columns:1fr 46px 70px; align-items:center; gap:6px; margin:3px 0; font-size:12px}
+  .pt-row .nm{font-family:monospace; color:var(--ink)}
+  .pt-row .io{font-size:10px; text-transform:uppercase; letter-spacing:.4px}
+  .pt-row .io.in{color:#7dd3fc} .pt-row .io.out{color:#86efac}
+  .pt-row input[type=number]{width:66px; background:var(--bg); color:var(--ink); border:1px solid var(--line);
+    border-radius:4px; padding:3px 5px; text-align:right}
+  .pt-row .tog{width:66px; padding:3px 0; border-radius:4px; border:1px solid var(--line); cursor:pointer;
+    background:var(--booloff); color:#000; font-weight:600; font-size:11px}
+  .pt-row .tog.on{background:var(--boolon)}
+  .pt-out{font-family:monospace; font-weight:700; text-align:right; font-variant-numeric:tabular-nums}
+  .ppcl-console{grid-column:1 / 2; background:#0c1118; overflow:auto; padding:8px 12px;
+    font:11.5px/1.5 monospace; color:#9fb3c8; border-top:1px solid var(--line)}
+  .ppcl-console .err{color:#fca5a5} .ppcl-console .warn{color:#fcd34d} .ppcl-console .ok{color:#86efac}
+  .ppcl-console .ln{color:#5d6878}
   label.inl{color:var(--dim); font-size:12px; display:flex; align-items:center; gap:4px}
   input.num{width:60px; background:var(--bg); color:var(--ink); border:1px solid var(--line);
     border-radius:4px; padding:3px 5px}
@@ -88,7 +121,11 @@
 </head>
 <body>
 <header>
-  <h1>CFC Simulator <small>· Siemens PXC field panel · Continuous Function Chart</small></h1>
+  <h1>PXC Simulator <small>· Siemens field panel</small></h1>
+  <div class="tabs">
+    <button id="tabCfc" class="tab active">CFC chart <small>(new)</small></button>
+    <button id="tabPpcl" class="tab">PPCL <small>(legacy)</small></button>
+  </div>
   <button id="runBtn" class="btn run">▶ Run</button>
   <button id="stepBtn" class="btn">⤵ Step</button>
   <button id="resetBtn" class="btn">⟲ Reset state</button>
@@ -118,6 +155,22 @@
 </div>
 
 <div id="inspector"><h2>Inspector</h2><div class="muted">Select a block to edit its parameters and watch its live pin values.</div></div>
+
+<div id="ppclPanel">
+  <div class="ppcl-edit">
+    <div class="ppcl-bar">
+      <button id="ppclParse" class="btn primary">⟳ Compile</button>
+      <button id="ppclExample" class="btn">Load AHU example</button>
+      <span>Line-numbered PPCL · runs top-to-bottom every scan</span>
+    </div>
+    <textarea id="ppclCode" spellcheck="false"></textarea>
+  </div>
+  <div class="ppcl-points">
+    <h3>Point database</h3>
+    <div id="ppclPointList"><div class="muted">Compile a program to populate points.</div></div>
+  </div>
+  <div class="ppcl-console" id="ppclConsole"></div>
+</div>
 
 <footer>
   <span><span id="runDot" class="dot off"></span><b id="runState">Stopped</b></span>
@@ -222,6 +275,12 @@ const DEFS = {
     outputs:[{n:'O',t:T_NUM}],params:[],compute:I=>({O:Math.max(num(I.I1),num(I.I2))})},
   ABS:{cat:'Math',title:'ABS',desc:'Absolute value',inputs:[{n:'X',t:T_NUM}],
     outputs:[{n:'O',t:T_NUM}],params:[],compute:I=>({O:Math.abs(num(I.X))})},
+  SQRT:{cat:'Math',title:'SQRT',desc:'Square root (PPCL SQRT)',inputs:[{n:'X',t:T_NUM}],
+    outputs:[{n:'O',t:T_NUM}],params:[],compute:I=>({O:Math.sqrt(Math.max(0,num(I.X)))})},
+  LOG:{cat:'Math',title:'LOG',desc:'Natural log (PPCL LOG)',inputs:[{n:'X',t:T_NUM}],
+    outputs:[{n:'O',t:T_NUM}],params:[],compute:I=>({O:num(I.X)>0?Math.log(num(I.X)):0})},
+  EXP:{cat:'Math',title:'EXP',desc:'Natural antilog e^x (PPCL EXP)',inputs:[{n:'X',t:T_NUM}],
+    outputs:[{n:'O',t:T_NUM}],params:[],compute:I=>({O:Math.exp(num(I.X))})},
 
   /* --- Timers --- */
   TON:{cat:'Timers',title:'TON',desc:'On-delay: Q true after IN held PT seconds',
@@ -611,8 +670,10 @@ function addBlock(type){
 
 /* ---------- run loop ---------- */
 function currentScanMs(){ return clamp(parseInt($('scanMs').value)||250,20,5000); }
-function tick(){ const t0=performance.now(); scan(); const dur=performance.now()-t0;
-  updateLive(); refreshInspectorLive(); $('scanDur').textContent=dur.toFixed(2); updateStatus(); }
+function tick(){ const t0=performance.now(); scan(); ppclRun(); const dur=performance.now()-t0;
+  if(mode==='cfc'){ updateLive(); refreshInspectorLive(); }
+  else { refreshPointValues(); renderConsole(); }
+  $('scanDur').textContent=dur.toFixed(2); updateStatus(); }
 function setRunning(on){ running=on;
   $('runBtn').textContent=on?'⏸ Pause':'▶ Run'; $('runBtn').className='btn '+(on?'stop':'run');
   $('runDot').className='dot '+(on?'on':'off'); $('runState').textContent=on?'Running':'Stopped';
@@ -621,7 +682,11 @@ function setRunning(on){ running=on;
 $('runBtn').onclick=()=>setRunning(!running);
 $('stepBtn').onclick=()=>{ if(running)setRunning(false); tick(); };
 $('resetBtn').onclick=()=>{ blocks.forEach(b=>{b.state={}; const def=DEFS[b.type];
-  def.outputs.forEach(o=>b.out[o.n]=dflt(o.t)); b.inVal=dflt((def.inputs[0]||{}).t);}); scanCount=0; render(); flash('State reset'); };
+  def.outputs.forEach(o=>b.out[o.n]=dflt(o.t)); b.inVal=dflt((def.inputs[0]||{}).t);}); scanCount=0; render();
+  // also re-zero PPCL written (output) points and its scan counter
+  PPCL.scan=0; PPCL.points.forEach((pt,nm)=>{ if(PPCL.written.has(nm))pt.v=0; });
+  if(mode==='ppcl'){ renderPointList(); renderConsole(); }
+  flash('State reset'); };
 $('scanMs').onchange=()=>{ if(running)setRunning(true); }; // restart interval at new rate
 
 /* ---------- status ---------- */
@@ -685,6 +750,279 @@ function loadExample(){
   flash('Loaded AHU example — press Run, then drag the SAT slider up/down');
 }
 $('exampleBtn').onclick=loadExample;
+
+/* ============================================================================
+   PPCL ENGINE — a line-numbered interpreter for legacy APOGEE PPCL programs.
+   Models PPCL's execution: the whole program runs top-to-bottom every scan
+   cycle; points are global; GOTO/GOSUB redirect the program counter.
+   Supports a pragmatic core subset (documented in the README); unsupported
+   statements are logged and skipped rather than aborting the program.
+   ========================================================================== */
+const PPCL = {
+  src:'', prog:[], lineMap:{}, points:new Map(), written:new Set(),
+  log:[], err:null, scan:0, compiled:false,
+};
+const PPCL_FUNCS={SQRT:x=>Math.sqrt(Math.max(0,x)),LOG:x=>x>0?Math.log(x):0,EXP:Math.exp,
+  SIN:Math.sin,COS:Math.cos,TAN:Math.tan,ATN:Math.atan,ABS:Math.abs,COM:x=>x?0:1};
+
+/* --- tokenizer: numbers, identifiers, dotted ops (.GT.), @prior, symbols --- */
+function ppclTokenize(s){
+  const out=[]; let i=0;
+  const isId=c=>/[A-Za-z0-9_$]/.test(c);
+  while(i<s.length){
+    const c=s[i];
+    if(c===' '||c==='\t'){i++;continue;}
+    if(c==='.'){ // dotted operator like .GT. .AND. .ROOT.
+      const m=s.slice(i).match(/^\.[A-Za-z]+\./);
+      if(m){ out.push({t:'op',v:m[0].toUpperCase()}); i+=m[0].length; continue; }
+    }
+    if(c==='@'){ const m=s.slice(i).match(/^@[A-Za-z]+/); out.push({t:'prior',v:(m?m[0]:'@').toUpperCase()}); i+=m?m[0].length:1; continue; }
+    if(/[0-9]/.test(c) || (c==='.'&&/[0-9]/.test(s[i+1]))){
+      const m=s.slice(i).match(/^[0-9]*\.?[0-9]+/); out.push({t:'num',v:parseFloat(m[0])}); i+=m[0].length; continue; }
+    if(isId(c)){ let j=i; while(j<s.length&&isId(s[j]))j++; out.push({t:'id',v:s.slice(i,j)}); i=j; continue; }
+    if('()+-*/,'.includes(c)){ out.push({t:'op',v:c}); i++; continue; }
+    i++; // skip anything unrecognised
+  }
+  return out;
+}
+/* --- recursive-descent evaluator over tokens --- */
+function ppclEval(tokens){
+  let p=0;
+  const peek=()=>tokens[p], eat=()=>tokens[p++];
+  const isOp=v=>peek()&&peek().t==='op'&&peek().v===v;
+  const getPoint=n=>{ if(!PPCL.points.has(n))PPCL.points.set(n,{v:0,bin:false,seen:true});
+    return PPCL.points.get(n).v; };
+  function primary(){
+    const tk=peek();
+    if(!tk) return 0;
+    if(tk.t==='op'&&tk.v==='('){ eat(); const v=logic(); if(isOp(')'))eat(); return v; }
+    if(tk.t==='op'&&tk.v==='-'){ eat(); return -unary(); }
+    if(tk.t==='num'){ eat(); return tk.v; }
+    if(tk.t==='prior'){ eat(); return 0; } // priorities not modelled → 0
+    if(tk.t==='id'){
+      const name=tk.v.toUpperCase();
+      if(PPCL_FUNCS[name] && tokens[p+1] && tokens[p+1].v==='('){
+        eat(); eat(); const a=logic(); if(isOp(')'))eat(); return PPCL_FUNCS[name](num(a));
+      }
+      if((name==='MIN'||name==='MAX') && tokens[p+1] && tokens[p+1].v==='('){
+        eat(); eat(); const args=[logic()]; while(isOp(',')){eat();args.push(logic());} if(isOp(')'))eat();
+        return name==='MIN'?Math.min(...args):Math.max(...args);
+      }
+      if(name==='ON') { eat(); return 1; }
+      if(name==='OFF'){ eat(); return 0; }
+      eat(); return getPoint(tk.v); // a point reference
+    }
+    eat(); return 0;
+  }
+  function unary(){ if(isOp('-')){eat();return -unary();} return primary(); }
+  function mul(){ let v=unary(); while(peek()&&peek().t==='op'&&['*','/','.ROOT.'].includes(peek().v)){
+    const o=eat().v, r=unary(); v= o==='*'?v*r : o==='/'?(r===0?0:v/r) : Math.pow(v,1/(r||1)); } return v; }
+  function add(){ let v=mul(); while(peek()&&peek().t==='op'&&['+','-'].includes(peek().v)){
+    const o=eat().v, r=mul(); v=o==='+'?v+r:v-r; } return v; }
+  function rel(){ let v=add(); while(peek()&&peek().t==='op'&&['.EQ.','.NE.','.GT.','.GE.','.LT.','.LE.'].includes(peek().v)){
+    const o=eat().v, r=add();
+    v= o==='.EQ.'?(Math.abs(v-r)<1e-9?1:0):o==='.NE.'?(Math.abs(v-r)<1e-9?0:1):
+       o==='.GT.'?(v>r?1:0):o==='.GE.'?(v>=r?1:0):o==='.LT.'?(v<r?1:0):(v<=r?1:0); } return v; }
+  function logic(){ let v=rel(); while(peek()&&peek().t==='op'&&['.AND.','.OR.','.XOR.','.NAND.'].includes(peek().v)){
+    const o=eat().v, r=rel(), a=v!==0, b=r!==0;
+    v= o==='.AND.'?(a&&b?1:0):o==='.OR.'?(a||b?1:0):o==='.XOR.'?(a!==b?1:0):(!(a&&b)?1:0); } return v; }
+  return logic();
+}
+/* --- parse one logical statement string into an executable node --- */
+function ppclParseStmt(text){
+  const s=text.trim(); if(!s) return {k:'nop'};
+  const up=s.toUpperCase();
+  if(up==='C'||up.startsWith('C ')) return {k:'comment',text:s.slice(1).trim()};
+  if(up.startsWith('IF')){
+    // IF (cond) THEN <stmt> [ELSE <stmt>]
+    const m=s.match(/^IF\s*\((.*?)\)\s*THEN\s+([\s\S]*)$/i);
+    if(!m) return {k:'bad',text:s,reason:'malformed IF'};
+    const cond=ppclTokenize(m[1]); let rest=m[2];
+    let thenPart=rest, elsePart=null;
+    const ei=rest.search(/\bELSE\b/i);
+    if(ei>=0){ thenPart=rest.slice(0,ei); elsePart=rest.slice(ei+4); }
+    return {k:'if',cond,then:ppclParseStmt(thenPart),else:elsePart?ppclParseStmt(elsePart):null};
+  }
+  if(up.startsWith('GOTO')) return {k:'goto',target:parseInt(s.replace(/[^0-9]/g,''))};
+  if(up.startsWith('GOSUB')) return {k:'gosub',target:parseInt(s.replace(/[^0-9]/g,''))};
+  if(up.startsWith('RETURN')) return {k:'return'};
+  const callm=s.match(/^([A-Za-z]+)\s*\((.*)\)\s*$/);
+  if(callm){
+    const fn=callm[1].toUpperCase(); const args=splitArgs(callm[2]);
+    if(fn==='ON'||fn==='OFF'){ const pts=args.filter(a=>!a.startsWith('@')); return {k:'state',on:fn==='ON',pts}; }
+    if(fn==='SET'){ let a=args.filter(x=>!x.startsWith('@')); const val=a.shift(); return {k:'set',val:ppclTokenize(val),pts:a}; }
+    if(fn==='RELEAS'||fn==='ENABLE'||fn==='DISABL'||fn==='ENALM'||fn==='DISALM')
+      return {k:'unsup',text:s,fn};
+    return {k:'unsup',text:s,fn};
+  }
+  // assignment:  NAME = expr
+  const am=s.match(/^([A-Za-z_$][A-Za-z0-9_$]*)\s*=\s*([\s\S]+)$/);
+  if(am) return {k:'assign',name:am[1],expr:ppclTokenize(am[2])};
+  return {k:'unsup',text:s};
+}
+function splitArgs(s){ const out=[]; let d=0,cur=''; for(const c of s){
+  if(c==='(')d++; if(c===')')d--; if(c===','&&d===0){out.push(cur.trim());cur='';continue;} cur+=c; }
+  if(cur.trim())out.push(cur.trim()); return out; }
+
+/* --- compile: merge continuation lines, index by line number --- */
+function ppclCompile(src){
+  PPCL.src=src; PPCL.prog=[]; PPCL.lineMap={}; PPCL.err=null; PPCL.log=[]; PPCL.compiled=false;
+  const raw=src.split(/\r?\n/); const logical=[];
+  for(const line of raw){
+    if(!line.trim()) continue;
+    const m=line.match(/^\s*(\d+)\s*([\s\S]*)$/);
+    if(m){ logical.push({ln:parseInt(m[1]),text:m[2]}); }
+    else if(logical.length){ logical[logical.length-1].text+=' '+line.trim(); } // continuation
+    else { ppclLog('warn','Ignored line without a line number: '+line.trim()); }
+  }
+  logical.sort((a,b)=>a.ln-b.ln);
+  PPCL.written=new Set();
+  logical.forEach((L,idx)=>{
+    const node=ppclParseStmt(L.text); node.ln=L.ln; node.raw=L.text.trim();
+    PPCL.prog.push(node); PPCL.lineMap[L.ln]=idx;
+    if(node.k==='bad') ppclLog('err',`Line ${L.ln}: ${node.reason} — "${node.raw}"`);
+    if(node.k==='unsup') ppclLog('warn',`Line ${L.ln}: unsupported statement "${node.fn||node.raw}" — skipped`);
+    // record written points
+    if(node.k==='assign') PPCL.written.add(node.name.toUpperCase());
+    if(node.k==='state'||node.k==='set') node.pts.forEach(p=>PPCL.written.add(p.toUpperCase()));
+    collectIfWrites(node);
+  });
+  // discover all referenced points (so the table lists inputs too)
+  PPCL.prog.forEach(n=>discoverPoints(n));
+  // initialise any new points at 0 (keep existing user-set values)
+  PPCL.compiled = !PPCL.prog.some(n=>n.k==='bad');
+  PPCL.scan=0;
+  ppclLog('ok',`Compiled ${PPCL.prog.length} statements, ${PPCL.points.size} points.`);
+  return PPCL.compiled;
+}
+function collectIfWrites(n){ if(n.k!=='if')return; [n.then,n.else].forEach(s=>{ if(!s)return;
+  if(s.k==='assign')PPCL.written.add(s.name.toUpperCase());
+  if(s.k==='state'||s.k==='set')s.pts.forEach(p=>PPCL.written.add(p.toUpperCase())); collectIfWrites(s); }); }
+function discoverPoints(n){
+  const reg=name=>{ const u=name; if(!PPCL.points.has(u))PPCL.points.set(u,{v:0,bin:false,seen:true}); };
+  const scanToks=toks=>toks&&toks.forEach(t=>{ if(t.t==='id'){ const nm=t.v.toUpperCase();
+    if(!PPCL_FUNCS[nm]&&nm!=='MIN'&&nm!=='MAX'&&nm!=='ON'&&nm!=='OFF') reg(t.v.toUpperCase()); } });
+  if(n.k==='assign'){ reg(n.name.toUpperCase()); scanToks(n.expr); }
+  if(n.k==='set'){ scanToks(n.val); n.pts.forEach(p=>{ reg(p.toUpperCase()); PPCL.points.get(p.toUpperCase()).bin=false; }); }
+  if(n.k==='state') n.pts.forEach(p=>{ reg(p.toUpperCase()); PPCL.points.get(p.toUpperCase()).bin=true; });
+  if(n.k==='if'){ scanToks(n.cond); discoverPoints(n.then); if(n.else)discoverPoints(n.else); }
+}
+function ppclLog(cls,msg){ PPCL.log.push({cls,msg}); if(PPCL.log.length>200)PPCL.log.shift(); }
+
+/* --- execute one full scan of the program --- */
+function ppclRun(){
+  if(!PPCL.compiled||!PPCL.prog.length) return;
+  let pc=0, steps=0; const stack=[]; const MAX=20000;
+  const setPt=(name,val,bin)=>{ const u=name.toUpperCase();
+    if(!PPCL.points.has(u))PPCL.points.set(u,{v:0,bin:!!bin,seen:true});
+    const pt=PPCL.points.get(u); pt.v=val; if(bin)pt.bin=true; };
+  function exec(node){ // returns {goto:idx} | {ret:true} | null
+    switch(node.k){
+      case 'assign': setPt(node.name, num(ppclEval(node.expr.slice())) ); return null;
+      case 'state': node.pts.forEach(p=>setPt(p, node.on?1:0, true)); return null;
+      case 'set': { const v=num(ppclEval(node.val.slice())); node.pts.forEach(p=>setPt(p,v)); return null; }
+      case 'goto': { const t=PPCL.lineMap[node.target];
+        if(t==null){ ppclLog('err',`Line ${node.target} not found (GOTO)`); return {ret:true}; } return {goto:t}; }
+      case 'gosub': { const t=PPCL.lineMap[node.target];
+        if(t==null){ ppclLog('err',`Line ${node.target} not found (GOSUB)`); return null; } stack.push(pc+1); return {goto:t}; }
+      case 'return': return stack.length?{goto:stack.pop()}:{ret:true};
+      case 'if': { const c=ppclEval(node.cond.slice());
+        if(c!==0) return node.then?exec(node.then):null;
+        else return node.else?exec(node.else):null; }
+      default: return null; // comment / nop / unsup / bad
+    }
+  }
+  if(PPCL.debug)PPCL.trace=[];
+  while(pc<PPCL.prog.length){
+    if(++steps>MAX){ ppclLog('err','Max steps exceeded — possible infinite loop. Aborted scan.'); break; }
+    if(PPCL.debug&&PPCL.trace.length<40)PPCL.trace.push({pc,ln:PPCL.prog[pc].ln,k:PPCL.prog[pc].k});
+    const r=exec(PPCL.prog[pc]);
+    if(r&&r.ret) break;
+    if(r&&r.goto!=null) pc=r.goto; else pc++;
+  }
+  PPCL.scan++;
+}
+
+/* --- PPCL UI --- */
+function renderPointList(){
+  const host=$('ppclPointList');
+  if(!PPCL.points.size){ host.innerHTML='<div class="muted">Compile a program to populate points.</div>'; return; }
+  const names=[...PPCL.points.keys()].sort();
+  let html='';
+  names.forEach(nm=>{
+    const pt=PPCL.points.get(nm); const isOut=PPCL.written.has(nm);
+    html+=`<div class="pt-row"><span class="nm">${nm}</span><span class="io ${isOut?'out':'in'}">${isOut?'out':'in'}</span>`;
+    if(isOut){ html+=`<span class="pt-out" id="po_${nm}">${pt.bin?(pt.v?'ON':'OFF'):pt.v.toFixed(1)}</span>`; }
+    else if(pt.bin){ html+=`<button class="tog ${pt.v?'on':''}" id="po_${nm}" data-pt="${nm}">${pt.v?'ON':'OFF'}</button>`; }
+    else { html+=`<input type="number" step="0.5" id="po_${nm}" data-pt="${nm}" value="${pt.v}">`; }
+    html+='</div>';
+  });
+  host.innerHTML=html;
+  host.querySelectorAll('input[data-pt]').forEach(inp=>inp.addEventListener('input',()=>{
+    PPCL.points.get(inp.dataset.pt).v=parseFloat(inp.value)||0; }));
+  host.querySelectorAll('button[data-pt]').forEach(b=>b.addEventListener('click',()=>{
+    const pt=PPCL.points.get(b.dataset.pt); pt.v=pt.v?0:1; b.classList.toggle('on',!!pt.v); b.textContent=pt.v?'ON':'OFF'; }));
+}
+function refreshPointValues(){
+  PPCL.points.forEach((pt,nm)=>{ const e=$('po_'+nm); if(!e)return;
+    if(PPCL.written.has(nm)){ e.textContent= pt.bin?(pt.v?'ON':'OFF'):pt.v.toFixed(1); }
+    else if(pt.bin && e.classList){ e.classList.toggle('on',!!pt.v); e.textContent=pt.v?'ON':'OFF'; }
+  });
+}
+function renderConsole(){
+  const c=$('ppclConsole');
+  c.innerHTML = `<div class="ln">— PXC PPCL interpreter · scan ${PPCL.scan} —</div>` +
+    PPCL.log.map(l=>`<div class="${l.cls}">${l.cls==='err'?'✕ ':l.cls==='warn'?'! ':'· '}${escapeHtml(l.msg)}</div>`).join('');
+  c.scrollTop=c.scrollHeight;
+}
+function escapeHtml(s){ return s.replace(/[&<>]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m])); }
+function ppclCompileUI(){ ppclCompile($('ppclCode').value); renderPointList(); renderConsole(); flash('PPCL compiled'); }
+$('ppclParse').onclick=ppclCompileUI;
+
+const PPCL_EXAMPLE =
+`00001  C  ==========================================================
+00002  C   AHU SUPPLY-AIR TEMPERATURE CONTROL  (legacy PPCL)
+00003  C   The same control is built as a CFC chart on the other tab.
+00004  C   Inputs : SAT (supply-air temp)   OCC (occupied 1/0)
+00005  C   Outputs: CLGV (cooling valve %)  ALARM (hi-temp alarm)
+00006  C  ==========================================================
+00010  SPT = 55.0
+00020  C  --- proportional cooling demand on temperature error ---
+00030  ERR = SAT - SPT
+00040  CLGV = ERR * 10.0
+00050  IF (CLGV .GT. 100.0) THEN CLGV = 100.0
+00060  IF (CLGV .LT. 0.0) THEN CLGV = 0.0
+00070  C  --- drive valve fully closed when unoccupied ---
+00080  IF (OCC .LT. 1.0) THEN CLGV = 0.0
+00090  C  --- high supply-air temperature alarm (with deadband) ---
+00100  IF (SAT .GT. 60.0) THEN ON(ALARM)
+00110  IF (SAT .LT. 56.0) THEN OFF(ALARM)
+00120  C  program re-runs top-to-bottom every scan cycle`;
+
+function loadPpclExample(){
+  $('ppclCode').value=PPCL_EXAMPLE;
+  PPCL.points=new Map();
+  ppclCompile(PPCL_EXAMPLE);
+  // seed input values for a lively demo
+  if(PPCL.points.get('SAT'))PPCL.points.get('SAT').v=62;
+  if(PPCL.points.get('OCC')){PPCL.points.get('OCC').v=1;PPCL.points.get('OCC').bin=true;}
+  renderPointList(); renderConsole();
+}
+$('ppclExample').onclick=()=>{ loadPpclExample(); flash('Loaded PPCL AHU example'); };
+
+/* ---------- tab switching ---------- */
+let mode='cfc';
+function setMode(m){ mode=m;
+  $('tabCfc').classList.toggle('active',m==='cfc');
+  $('tabPpcl').classList.toggle('active',m==='ppcl');
+  $('palette').style.display = m==='cfc'?'':'none';
+  $('canvasWrap').style.display = m==='cfc'?'':'none';
+  $('inspector').style.display = m==='cfc'?'':'none';
+  $('ppclPanel').classList.toggle('show',m==='ppcl');
+  if(m==='ppcl' && !PPCL.prog.length) loadPpclExample();
+}
+$('tabCfc').onclick=()=>setMode('cfc');
+$('tabPpcl').onclick=()=>setMode('ppcl');
 
 /* ---------- boot ---------- */
 buildPalette(); applyView();

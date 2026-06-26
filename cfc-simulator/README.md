@@ -1,14 +1,23 @@
-# CFC Simulator — Siemens PXC field panel (Continuous Function Chart)
+# PXC Simulator — Siemens field panel (CFC + PPCL)
 
-A self-contained, browser-based **Continuous Function Chart (CFC)** editor and
-**scan-cycle simulator**, modelling the way newer Siemens **PXC** field panels are
-programmed — the graphical block-and-wire approach (authored in Siemens **ABT Site**)
-that is **replacing PPCL** on these controllers.
+A self-contained, browser-based simulator for Siemens **PXC** field panels, with **two
+modes** that sit side by side so you can model the migration directly:
+
+- **CFC chart (new)** — a **Continuous Function Chart** editor and **scan-cycle
+  simulator**. The graphical block-and-wire approach (authored in Siemens **ABT Site**)
+  that is **replacing PPCL** on these controllers.
+- **PPCL (legacy)** — a **line-numbered PPCL interpreter** that actually runs your
+  legacy APOGEE program top-to-bottom every scan, against a live point database.
+
+Both ship with the **same AHU control example**, so you can see the old way and the new
+way produce the same behaviour.
 
 It is a single file — [`index.html`](./index.html). No build step, no server, no
 dependencies. Double-click it (or open it in any modern browser) and it runs.
 
-![screenshot](./screenshot.png)
+| CFC chart mode | PPCL mode |
+|---|---|
+| ![cfc](./screenshot.png) | ![ppcl](./screenshot-ppcl.png) |
 
 ---
 
@@ -92,7 +101,7 @@ Wires are **type-checked**: analog (blue) pins only connect to analog pins, bina
 | **Constants** | `CONST` (analog) · `DCONST` (digital) |
 | **Logic** | `AND` `OR` `NOT` `XOR` · `RS` (reset-dominant latch) |
 | **Compare** | `GT` `LT` `EQ` (with tolerance) · `HYST` (hysteresis switch) |
-| **Math** | `ADD` `SUB` `MUL` `DIV` `MIN` `MAX` `ABS` |
+| **Math** | `ADD` `SUB` `MUL` `DIV` `MIN` `MAX` `ABS` · `SQRT` `LOG` `EXP` (PPCL fns) |
 | **Timers** | `TON` (on-delay) · `TOF` (off-delay) · `PULSE` (TP) |
 | **Control** | `PID` (with anti-windup) · `RAMP` · `LIMIT` · `SEL` (selector) |
 
@@ -118,6 +127,43 @@ and the high-temp alarm trip.
 
 ---
 
+## PPCL mode — running legacy programs
+
+Switch to the **PPCL (legacy)** tab to run a real APOGEE PPCL program. The interpreter
+mirrors how a field panel executes PPCL: the whole program runs **top-to-bottom every
+scan cycle**, points are global, and `GOTO`/`GOSUB` redirect the program counter.
+
+- **Editor (left)** — type or paste line-numbered PPCL, then **Compile**.
+- **Point database (right)** — every referenced point appears automatically.
+  **Inputs** (read but never written by the program) are editable — type a value or
+  toggle a binary point. **Outputs** (written by the program) show their live computed
+  value each scan.
+- **Console (bottom)** — compile results, plus any errors or unsupported statements.
+
+Press **Run** (or **Step**) and the program executes against the points. The built-in
+example is the **same AHU loop** as the CFC chart, so the two tabs agree.
+
+### Supported PPCL subset
+
+| Area | Supported |
+|------|-----------|
+| Structure | line numbers, `C` comments, line **continuation**, `GOTO`, `GOSUB`/`RETURN` |
+| Conditionals | `IF (…) THEN … [ELSE …]` (statement may be assignment / `GOTO` / `ON`/`OFF`/`SET`) |
+| Assignment | `NAME = expression` |
+| Commands | `ON(…)`, `OFF(…)`, `SET(value, pt…)` (with optional `@priority`, which is parsed and ignored) |
+| Relational | `.EQ. .NE. .GT. .GE. .LT. .LE.` |
+| Logical | `.AND. .OR. .XOR. .NAND.` |
+| Arithmetic | `+ − * /`, unary `−`, parentheses, `.ROOT.` |
+| Functions | `SQRT LOG EXP SIN COS TAN ATN ABS COM MIN MAX` |
+
+**Not yet modelled** (parsed, logged as *unsupported*, and skipped so the rest of the
+program still runs): the HVAC application statements — `LOOP` (PID), `DC` (duty cycle),
+`SSTO`, `TOD`/`TODSET`, `PDL*`, `TABLE`, `SAMPLE`, `TIMAVG`, alarm/COV enable/disable,
+priority arrays, and resident points (`TIME`, `DAY`, …). These are the natural next
+additions — see the roadmap.
+
+---
+
 ## Fidelity note
 
 This models **standard CFC / IEC 61131-3 FBD execution semantics** and a pragmatic,
@@ -128,8 +174,15 @@ extended to match exact block names, pins, and behaviour.
 
 ## Roadmap ideas
 
+- **PPCL → CFC translator** — parse a PPCL listing and scaffold the equivalent CFC chart
+  (blocks + wires), turning the two tabs into a real migration tool
+- Model the PPCL HVAC application statements (`LOOP`, `DC`, `SSTO`, `TOD`, `PDL*`)
 - Match exact Siemens ABT Site block names / icons from the manual
 - BACnet-style point properties (priority array, COV, reliability)
-- Trend chart / strip recorder for selected pins
+- Trend chart / strip recorder for selected pins / points
 - Sub-charts (compound blocks) and a block search box
-- Import a PPCL listing and scaffold an equivalent chart
+
+## Reference
+
+PPCL semantics follow the *APOGEE Powers Process Control Language (PPCL) User's Manual*,
+Siemens Building Technologies document **125-1896 Rev. 5**.
