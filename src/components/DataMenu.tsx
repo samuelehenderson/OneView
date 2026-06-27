@@ -2,10 +2,9 @@ import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../data/store'
 import { paths } from '../api'
-import { buildingFromUpload, csvFromBuilding, TEMPLATE_CSV } from '../data/io'
+import { buildingFromUpload, csvFromBuilding, templateXlsx, TEMPLATE_CSV } from '../data/io'
 
-function download(filename: string, text: string, mime: string) {
-  const blob = new Blob([text], { type: mime })
+function downloadBlob(filename: string, blob: Blob) {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
@@ -13,6 +12,7 @@ function download(filename: string, text: string, mime: string) {
   a.click()
   URL.revokeObjectURL(url)
 }
+const download = (filename: string, text: string, mime: string) => downloadBlob(filename, new Blob([text], { type: mime }))
 
 export function DataMenu() {
   const { project, building, canEdit, replaceBuilding } = useStore()
@@ -47,7 +47,12 @@ export function DataMenu() {
         style={{ display: 'none' }}
         onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = '' }} />
       {canEdit && <button className="btn" onClick={() => fileInput.current?.click()}>Import</button>}
-      <button className="btn secondary" onClick={() => download('oneview-template.csv', TEMPLATE_CSV, 'text/csv')}>Template</button>
+      <button className="btn secondary" title="Excel template with an Instructions sheet"
+        onClick={async () => { try { downloadBlob('OneView-template.xlsx', await templateXlsx()) } catch (e) { flash(`Template failed: ${(e as Error).message}`, false) } }}>
+        Template
+      </button>
+      <button className="btn secondary" title="Download a plain CSV template"
+        onClick={() => download('oneview-template.csv', TEMPLATE_CSV, 'text/csv')}>CSV</button>
       <button className="btn secondary" onClick={() => download(`${building.name}.csv`, csvFromBuilding(building), 'text/csv')}>Export</button>
       {msg && <span className="datamenu-msg" style={{ color: msg.ok ? 'var(--ok)' : 'var(--alarm)' }}>{msg.text}</span>}
     </div>

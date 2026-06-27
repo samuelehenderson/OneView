@@ -92,14 +92,21 @@ For larger multi-user scale later, swap the JSON store in `server/src/db.ts` for
 
 ## Importing your data
 
-Toolbar → **Template** downloads `oneview-template.csv`; fill it in (Excel / Sheets) and
-**Import**. Import accepts **Excel (`.xlsx`/`.xls`), `.csv`, or a OneView `.json` export** —
-for Excel the first sheet is read. One row per work scope:
+Toolbar → **Template** downloads a formatted **Excel template** (`OneView-template.xlsx`)
+with an *Instructions* sheet and example rows; **CSV** downloads the same as a plain `.csv`.
+Fill it in, then **Import**. Import accepts **Excel (`.xlsx`/`.xls`), `.csv`, or a OneView
+`.json` export** — for Excel, the first sheet whose header has Floor/Area/Scope is used
+(so an Instructions sheet is skipped). One row per work scope:
 
-`Floor, Level, Area, Scope, Discipline, Status, Progress, Contractor, Responsible, Start, Target, Turnover, Punch, Notes`
+`Floor, Level, Area, Scope, Discipline, Status, Progress, Contractor, Responsible, Start, Target, Turnover, Punch, Notes, Comments`
 
-Only `Floor`, `Area`, `Scope` are required; columns can be in any order; status/discipline
-accept friendly spellings. Floor/area layouts are generated automatically.
+- Only `Floor`, `Area`, `Scope` are required; columns can be in any order; status/discipline
+  accept friendly spellings; floor/area layouts are generated automatically.
+- **`Punch`** accepts either a **number** (open count) or a **list of items** separated by
+  `;` (e.g. `Replace gauge; Label valves`) — a list becomes real punch-list items.
+- **`Comments`** is an optional `;`-separated list; each becomes a comment on the scope.
+- **Export** writes the current building back to CSV in the same shape (punch items and
+  comments included), so you can round-trip.
 
 ### Floor stacking (the `Level` column)
 

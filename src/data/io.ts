@@ -5,7 +5,7 @@
 // only carries data, not drawing coordinates. A full-fidelity JSON Building object
 // is also accepted (e.g. re-importing an export).
 
-import type { Area, Building, Floor, ProgressStatus, Scope, ScopeType } from './types'
+import type { Area, Building, Comment, Floor, ProgressStatus, PunchItem, Scope, ScopeType } from './types'
 
 // ---- Column order for CSV (header row) --------------------------------------
 
@@ -24,6 +24,7 @@ export const CSV_COLUMNS = [
   'Turnover',
   'Punch',
   'Notes',
+  'Comments',
 ] as const
 
 // ---- Normalisers (accept friendly spellings) --------------------------------
@@ -47,6 +48,9 @@ const DISCIPLINE_MAP: Record<string, ScopeType> = {
   it: 'it-data', data: 'it-data', 'it-data': 'it-data', comms: 'it-data', bms: 'it-data',
   fitout: 'fitout', 'fit-out': 'fitout', 'fit out': 'fitout',
 }
+
+// Split a cell into a list on ; | or newline (used for punch items and comments).
+const splitList = (s: string): string[] => s.split(/[;|\n]+/).map((x) => x.trim()).filter(Boolean)
 
 const normStatus = (s: string): ProgressStatus => STATUS_MAP[s.trim().toLowerCase()] ?? 'not-started'
 const normDiscipline = (s: string): ScopeType => DISCIPLINE_MAP[s.trim().toLowerCase()] ?? 'fitout'
@@ -163,6 +167,18 @@ export function buildingFromRows(rows: string[][], name = 'Imported Building', a
     }
     const f = floors.get(floorName)!
     if (!f.areas.has(areaName)) f.areas.set(areaName, [])
+
+    // Punch column: a plain number = open count; anything else = a list of punch items.
+    const punchRaw = get(r, 'punch')
+    const punchNum = Number(punchRaw)
+    const isCount = punchRaw !== '' && Number.isInteger(punchNum) && String(punchNum) === punchRaw.trim()
+    const punchList: PunchItem[] | undefined = isCount || !punchRaw
+      ? undefined
+      : splitList(punchRaw).map((text) => ({ id: uid('pn'), text, done: false, createdAt: new Date().toISOString() }))
+    const comments: Comment[] | undefined = get(r, 'comments')
+      ? splitList(get(r, 'comments')).map((text) => ({ id: uid('cm'), text, author: 'Import', at: new Date().toISOString() }))
+      : undefined
+
     f.areas.get(areaName)!.push({
       name: scopeName,
       type: normDiscipline(get(r, 'discipline')),
@@ -173,8 +189,10 @@ export function buildingFromRows(rows: string[][], name = 'Imported Building', a
       startDate: get(r, 'start') || undefined,
       targetDate: get(r, 'target') || undefined,
       turnoverDate: get(r, 'turnover') || undefined,
-      openPunch: Number(get(r, 'punch')) || 0,
+      openPunch: isCount ? punchNum : 0,
       notes: get(r, 'notes') || '',
+      punchList,
+      comments,
     })
   }
 
@@ -210,12 +228,16 @@ export function csvFromBuilding(b: Building): string {
   const lines = [CSV_COLUMNS.join(',')]
   for (const f of b.floors)
     for (const a of f.areas)
-      for (const s of a.scopes)
+      for (const s of a.scopes) {
+        // Export punch as the item list when present, otherwise the legacy count.
+        const punch = s.punchList && s.punchList.length ? s.punchList.map((p) => p.text).join('; ') : (s.openPunch ?? '')
+        const comments = (s.comments ?? []).map((c) => c.text).join('; ')
         lines.push(
-          [f.name, f.level, a.name, s.name, s.type, s.status, s.progress, s.contractor, s.responsible, s.startDate, s.targetDate, s.turnoverDate, s.openPunch, s.notes]
+          [f.name, f.level, a.name, s.name, s.type, s.status, s.progress, s.contractor, s.responsible, s.startDate, s.targetDate, s.turnoverDate, punch, s.notes, comments]
             .map(csvCell)
             .join(','),
         )
+      }
   return lines.join('\n')
 }
 
@@ -226,12 +248,19 @@ export function csvFromBuilding(b: Building): string {
 export async function buildingFromXlsx(buffer: ArrayBuffer, name = 'Imported Building'): Promise<Building> {
   const XLSX = await import('xlsx')
   const wb = XLSX.read(buffer, { type: 'array' })
-  const sheet = wb.Sheets[wb.SheetNames[0]]
-  if (!sheet) throw new Error('The workbook has no sheets.')
-  // header:1 → array-of-arrays; defval keeps empty cells aligned; everything as strings.
-  const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, raw: false, defval: '' })
-  const stringRows = rows.map((r) => r.map((c) => (c == null ? '' : String(c))))
-  return buildingFromRows(stringRows, name)
+  if (wb.SheetNames.length === 0) throw new Error('The workbook has no sheets.')
+  const toRows = (sheetName: string) =>
+    XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[sheetName], { header: 1, raw: false, defval: '' })
+      .map((r) => r.map((c) => (c == null ? '' : String(c))))
+  const hasData = (rows: string[][]) => {
+    const h = (rows[0] ?? []).map((c) => c.trim().toLowerCase())
+    return ['floor', 'area', 'scope'].every((k) => h.includes(k))
+  }
+  // Use the first sheet whose header has the required columns (skips an Instructions sheet);
+  // fall back to the first sheet if none match.
+  let rows = toRows(wb.SheetNames[0])
+  for (const sn of wb.SheetNames) { const r = toRows(sn); if (hasData(r)) { rows = r; break } }
+  return buildingFromRows(rows, name)
 }
 
 // ---- Detect & dispatch (reads the File itself) -------------------------------
@@ -253,11 +282,52 @@ export async function buildingFromUpload(file: File): Promise<Building> {
 
 // ---- Starter template --------------------------------------------------------
 
-export const TEMPLATE_CSV = `Floor,Level,Area,Scope,Discipline,Status,Progress,Contractor,Responsible,Start,Target,Turnover,Punch,Notes
-Level 1,1,Open Office,HVAC,HVAC,In Progress,60,CoolAir Mechanical,J. Smith,2026-02-01,2026-06-15,,2,Ductwork in progress
-Level 1,1,Open Office,Electrical,Electrical,In Progress,45,Voltline Electrical,A. Patel,2026-02-01,2026-06-15,,0,
-Level 1,1,Open Office,Fire,Fire,Not Started,0,SafeGuard Fire,,2026-04-01,2026-06-20,,0,
-Level 1,1,Meeting Room,Finishes,Finishes,Commissioning,90,Apex Interiors,,2026-03-01,2026-06-10,,3,Snagging underway
-Level 2,2,Open Office,HVAC,HVAC,Turned Over,100,CoolAir Mechanical,,2026-01-15,2026-05-01,2026-04-30,0,Handed over
-Level 2,2,Server Room,IT-Data,IT,On Hold,20,Integrated Controls,,2026-03-01,2026-06-20,,1,Awaiting client sign-off
+// One row per work scope. Punch can be a number (open count) OR a list of items
+// separated by ";". Comments is an optional ";"-separated list. Only Floor, Area,
+// Scope are required; columns may be in any order.
+export const TEMPLATE_CSV = `Floor,Level,Area,Scope,Discipline,Status,Progress,Contractor,Responsible,Start,Target,Turnover,Punch,Notes,Comments
+Roof Plant,4,Plant Room,Chillers,HVAC,Commissioning,85,CoolAir Mechanical,J. Smith,2026-01-10,2026-06-10,,Replace gauge; Label valves,Witness test pending,Cx scheduled 12th
+Level 2,2,Open Office,HVAC,HVAC,Turned Over,100,CoolAir Mechanical,,2026-01-15,2026-05-01,2026-04-30,0,Handed over,
+Level 2,2,Server Room,IT-Data,IT,On Hold,20,Integrated Controls,,2026-03-01,2026-06-20,,1,Awaiting client sign-off,Blocked by RFI-142
+Level 1,1,Open Office,Electrical,Electrical,In Progress,45,Voltline Electrical,A. Patel,2026-02-01,2026-06-15,,Tidy cable tray; Test circuits 4-9,,
+Level 1,1,Meeting Room,Finishes,Finishes,Commissioning,90,Apex Interiors,,2026-03-01,2026-06-10,,3,Snagging underway,
+Ground,0,Lobby,Fire,Fire,Not Started,0,SafeGuard Fire,,2026-04-01,2026-06-20,,0,,
+Basement,-1,Car Park,Lighting,Electrical,In Progress,30,Voltline Electrical,,2026-03-15,2026-07-01,,Aim fittings,,
 `
+
+// A formatted Excel template: an Instructions sheet plus a Progress sheet pre-filled
+// with the example rows above. SheetJS is loaded on demand.
+export async function templateXlsx(): Promise<Blob> {
+  const XLSX = await import('xlsx')
+  const ws = XLSX.utils.aoa_to_sheet(parseCsv(TEMPLATE_CSV))
+  ws['!cols'] = CSV_COLUMNS.map((c) => ({ wch: c === 'Notes' || c === 'Comments' || c === 'Punch' ? 24 : 14 }))
+
+  const instr = [
+    ['OneView — import template'],
+    [''],
+    ['Fill in the “Progress” sheet — one row per work scope — then Import it in OneView.'],
+    ['Required: Floor, Area, Scope. Everything else is optional and columns can be in any order.'],
+    [''],
+    ['Column', 'What to put'],
+    ['Floor', 'Floor name. Rows sharing a Floor are grouped onto that floor.'],
+    ['Level', 'Stacking order — higher number = higher up. Ground = 0, basement = -1. If blank, inferred from the name (Roof / Ground / “Level 3”).'],
+    ['Area', 'Room or area within the floor.'],
+    ['Scope', 'The work item, e.g. HVAC, Electrical, Finishes.'],
+    ['Discipline', 'hvac, electrical, plumbing, fire, finishes, structure, it-data, fitout (friendly spellings accepted).'],
+    ['Status', 'Not Started · In Progress · Commissioning · Turned Over · On Hold.'],
+    ['Progress', 'Percent complete, 0–100.'],
+    ['Contractor / Responsible', 'Free text.'],
+    ['Start / Target / Turnover', 'Dates in YYYY-MM-DD format.'],
+    ['Punch', 'Either a number (open count) OR a list of punch items separated by “;”.'],
+    ['Notes', 'Free text.'],
+    ['Comments', 'Optional — a “;”-separated list; each becomes a comment on the scope.'],
+  ]
+  const wsi = XLSX.utils.aoa_to_sheet(instr)
+  wsi['!cols'] = [{ wch: 26 }, { wch: 95 }]
+
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, wsi, 'Instructions')
+  XLSX.utils.book_append_sheet(wb, ws, 'Progress')
+  const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer
+  return new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+}
