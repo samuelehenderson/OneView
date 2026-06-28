@@ -67,6 +67,19 @@ panel selector):
 Use **Paste PPCL…** to drop in your own panel export. The samples live in
 [`samples/`](./samples/).
 
+### Campus view — cross-panel references
+
+The panel selector groups programs by **project**. When a project has several programs,
+GhostMap detects **cross-panel references** — where one program reads or writes a point
+owned by another — and shows them in the right rail, clickable to jump between panels. On
+the Correct Patient campus it surfaces, automatically:
+
+- **DAMPERS → AHU7** (*monitors* `AHU7.SSD`/`AHU7.RSD`) — fire dampers close on AHU7 smoke
+- **EF147 → EF148** (*commands* `EF148.SPD`) — one exhaust fan drives another's speed
+
+A point is "owned" by the program whose namespace prefix it carries; references that cross
+that boundary become campus edges (with direction: *commands* vs *monitors*).
+
 ### Pulling PPCL out of a panel backup
 
 A clean `.pcl` listing is the easy case. Real panel backups are often **PXC-Modular `.P2`

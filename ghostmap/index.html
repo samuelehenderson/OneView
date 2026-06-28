@@ -85,6 +85,15 @@
   .flag .ft{font-weight:600; font-size:12px; display:flex; justify-content:space-between; gap:8px}
   .flag .fd{color:var(--dim); font-size:11px; margin-top:3px}
   .flag .badge{font-size:10px; color:var(--dim); font-variant-numeric:tabular-nums}
+  .xgrp{margin:6px 0 10px}
+  .xgrp .xh{font-size:11px; color:var(--dim); margin-bottom:4px}
+  .xedge{background:var(--panel2); border:1px solid var(--line); border-radius:6px; padding:7px 9px; margin:5px 0; cursor:pointer}
+  .xedge:hover{border-color:var(--accent)}
+  .xedge .xt{font-size:12px; font-weight:600; display:flex; align-items:center; gap:6px}
+  .xedge .dir{font-size:10px; padding:1px 6px; border-radius:8px; border:1px solid}
+  .xedge .dir.cmd{color:var(--out); border-color:#6b2a4d} .xedge .dir.mon{color:var(--in); border-color:#1e4d63}
+  .xedge .pts{color:var(--code); font-family:ui-monospace,monospace; font-size:10.5px; margin-top:3px; word-break:break-word}
+  .arrow2{color:var(--accent)}
   .mode-flow{font-family:ui-monospace,monospace; font-size:11px; line-height:1.7}
   .mode-flow .br{color:var(--dim)} .mode-flow .tgt{color:var(--accent); cursor:pointer}
   .mode-flow .cond{color:var(--code)}
@@ -123,6 +132,10 @@
 </div>
 
 <div id="flags">
+  <div id="crossWrap" style="display:none">
+    <h2>Cross-panel references</h2>
+    <div id="crossRefs"></div>
+  </div>
   <h2>Forensic summary</h2>
   <div class="stat-grid" id="statGrid"></div>
   <h2>Control flow · operating modes</h2>
@@ -612,6 +625,308 @@ const SAMPLE_AHU7 = String.raw`00010	C AHU7
 32700	GOTO 100`;
 
 
+
+const SAMPLE_DAMPERS = String.raw`00010	C DAMPERS
+00014	C  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+00016	C * WARRANTY                                                                   *
+00018	C * THIS PROGRAM WAS CREATED BY SIEMENS                                        *
+00020	C * ANY MODIFICATION TO THIS PROGRAM MAY VOID THE WARRANTY                     *
+00022	C * PLEASE CONTACT YOUR SIEMENS REPRESENTATIVE FOR SERVICE                     *
+00024	C *                                                                            *
+00026	C * Siemens                                                                    *
+00028	C * JOB NAME:          Gainesville Correct Patient                             *
+00030	C * JOB NUMBER:        44OP-335165                                             *
+00032	C * DESCRIPTION:                                                               *
+00034	C * ADDRESS:                                                                   *
+00036	C * CITY:                                                                      *
+00038	C * STATE:                                                                     *
+00040	C * COUNTRY:                                                                   *
+00042	C * PHONE:                                                                     *
+00046	C * NOTES:                                                                     *
+00048	C * SYSTEM NAME:       DAMPERS                                                 *
+00050	C * POINT NAME PREFIX: GVL.CPPD.DAMPERS.                                       *
+00052	C *                                                                            *
+00054	C  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+00056	C
+00058	C VER  DATE         TOOL         INITIALS     CS
+00060	C 1.0  07/29/2022   CT           LHH          INITIAL PROGRAMMING
+00062	C 1.1  07/29/2022   CT           LHH          TESTED PROGRAM AND TUNED SYSTEM
+00064	C 1.2  MM/DD/YYYY   Desigo CC                 ADJUSTED TIMERS FOR CUSTOMER
+00066	C TRENDED ALL POINTS
+00095	C
+00096	C ----- DEFINE NAMES, CREATE LOCAL POINTS -----
+00099	C
+00100	DEFINE (X, "GVL.CPPD.EF148.")
+00110	C
+00597	C
+00598	C ----- RESIDENT POINT DEFINITIONS -----
+00599	C     - USED RESIDENT POINTS & THE FIRST LINE IT OCCURRED IN -
+00600	C     - $LOC1,  IS NOT USED -
+00601	C     - $LOC2,  IS NOT USED -
+00602	C     - $LOC3,  IS NOT USED -
+00603	C     - $LOC4,  IS NOT USED -
+00604	C     - $LOC5,  IS NOT USED -
+00605	C     - $LOC6,  IS NOT USED -
+00606	C     - $LOC7,  IS NOT USED -
+00607	C     - $LOC8,  IS NOT USED -
+00608	C     - $LOC9,  IS NOT USED -
+00609	C     - $LOC10, IS NOT USED -
+00610	C     - $LOC11, IS NOT USED -
+00611	C     - $LOC12, IS NOT USED -
+00612	C     - $LOC13, IS NOT USED -
+00613	C     - $LOC14, IS NOT USED -
+00614	C     - $LOC15, IS NOT USED -
+00615	C
+00620	C     - SECNDS, NOT USED -
+00623	C     - SECND1, NOT USED -
+00626	C     - SECND2, NOT USED -
+00628	C     - SECND3, NOT USED -
+00630	C     - SECND4, NOT USED -
+00632	C     - SECND5, NOT USED -
+00633	C     - SECND6, NOT USED -
+00634	C     - SECND7, NOT USED -
+00694	C
+00990	C
+01000	C     - CLOSE DAMPERS IF SMOKE IS DETECTED -
+01010	C
+01020	IF ("GVL.CPPD.AHU7.RSD" .EQ. ON .OR. "GVL.CPPD.AHU7.SSD" .EQ. ON) THEN GOTO 3000
+01030	C
+01040	C
+01050	C
+01060	C
+02000	ON ("GVL.CPPD.FD1.DMP")
+02010	ON ("GVL.CPPD.FD2.DMP")
+02020	ON ("GVL.CPPD.FD3.DMP")
+02030	ON ("GVL.CPPD.FD4.DMP")
+02040	C
+02050	GOTO 32700
+02060	C
+03000	OFF ("GVL.CPPD.FD1.DMP")
+03010	OFF ("GVL.CPPD.FD2.DMP")
+03020	OFF ("GVL.CPPD.FD3.DMP")
+03030	OFF ("GVL.CPPD.FD4.DMP")
+03040	C
+03050	C
+03060	C
+32700	GOTO 100`;
+
+const SAMPLE_EF101 = String.raw`00010	C EF101
+00014	C  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+00016	C * WARRANTY                                                                   *
+00018	C * THIS PROGRAM WAS CREATED BY SIEMENS                                        *
+00020	C * ANY MODIFICATION TO THIS PROGRAM MAY VOID THE WARRANTY                     *
+00022	C * PLEASE CONTACT YOUR SIEMENS REPRESENTATIVE FOR SERVICE                     *
+00024	C *                                                                            *
+00026	C * Siemens                                                                    *
+00028	C * JOB NAME:          Gainesville Correct Patient                             *
+00030	C * JOB NUMBER:        44OP-335165                                             *
+00032	C * DESCRIPTION:                                                               *
+00034	C * ADDRESS:                                                                   *
+00036	C * CITY:                                                                      *
+00038	C * STATE:                                                                     *
+00040	C * COUNTRY:                                                                   *
+00042	C * PHONE:                                                                     *
+00046	C * NOTES:                                                                     *
+00048	C * SYSTEM NAME:       EF101                                                   *
+00050	C * POINT NAME PREFIX: GVL.CPPD.EF101.                                         *
+00052	C *                                                                            *
+00054	C  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+00056	C
+00058	C VER  DATE         TOOL         INITIALS     CS
+00060	C 1.0  07/29/2022   CT           LHH          INITIAL PROGRAMMING
+00062	C 1.1  07/29/2022   CT           LHH          TESTED PROGRAM AND TUNED SYSTEM
+00064	C 1.2  MM/DD/YYYY   Desigo CC                 ADJUSTED TIMERS FOR CUSTOMER
+00066	C TRENDED ALL POINTS
+00095	C
+00096	C ----- DEFINE NAMES, CREATE LOCAL POINTS -----
+00099	C
+00100	DEFINE (X, "GVL.CPPD.EF101.")
+00110	C
+00467	C
+00468	C   --- WITH A RETURN FROM A POWER LOSS, RESET THE SYSTEM ---
+00469	C
+00470	ONPWRT (16000)
+00597	C
+00598	C ----- RESIDENT POINT DEFINITIONS -----
+00599	C     - USED RESIDENT POINTS & THE FIRST LINE IT OCCURRED IN -
+00600	C     - $LOC1,  IS NOT USED -
+00601	C     - $LOC2,  IS NOT USED -
+00602	C     - $LOC3,  IS NOT USED -
+00603	C     - $LOC4,  IS NOT USED -
+00604	C     - $LOC5,  IS NOT USED -
+00605	C     - $LOC6,  IS NOT USED -
+00606	C     - $LOC7,  IS NOT USED -
+00607	C     - $LOC8,  IS NOT USED -
+00608	C     - $LOC9,  IS NOT USED -
+00609	C     - $LOC10, IS NOT USED -
+00610	C     - $LOC11, IS NOT USED -
+00611	C     - $LOC12, IS NOT USED -
+00612	C     - $LOC13, IS NOT USED -
+00613	C     - $LOC14, IS NOT USED -
+00614	C     - $LOC15, IS NOT USED -
+00615	C
+00620	C     - SECNDS, NOT USED -
+00623	C     - SECND1, NOT USED -
+00626	C     - SECND2, NOT USED -
+00628	C     - SECND3, NOT USED -
+00630	C     - SECND4, NOT USED -
+00632	C     - SECND5, NOT USED -
+00633	C     - SECND6, NOT USED -
+00634	C     - SECND7, NOT USED -
+00694	C
+00990	C
+01000	C     - START WHEN ROOM TEMP IS ABOVE SETPOINT -
+01010	C
+01020	IF ("GVL.CPPD.EF101.RMT" .GT. ("GVL.CPPD.EF101.RMT.SP" + 0.5)) THEN ON ("GVL.CPPD.EF101.SS")
+01030	IF ("GVL.CPPD.EF101.RMT" .LT. ("GVL.CPPD.EF101.RMT.SP" - 0.5)) THEN ON ("GVL.CPPD.EF101.SS")
+01040	C
+01050	C
+32700	GOTO 100`;
+
+const SAMPLE_EF147 = String.raw`00010	C EF147
+00014	C  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+00016	C * WARRANTY                                                                   *
+00018	C * THIS PROGRAM WAS CREATED BY SIEMENS                                        *
+00020	C * ANY MODIFICATION TO THIS PROGRAM MAY VOID THE WARRANTY                     *
+00022	C * PLEASE CONTACT YOUR SIEMENS REPRESENTATIVE FOR SERVICE                     *
+00024	C *                                                                            *
+00026	C * Siemens                                                                    *
+00028	C * JOB NAME:          Gainesville Correct Patient                             *
+00030	C * JOB NUMBER:        44OP-335165                                             *
+00032	C * DESCRIPTION:                                                               *
+00034	C * ADDRESS:                                                                   *
+00036	C * CITY:                                                                      *
+00038	C * STATE:                                                                     *
+00040	C * COUNTRY:                                                                   *
+00042	C * PHONE:                                                                     *
+00046	C * NOTES:                                                                     *
+00048	C * SYSTEM NAME:       EF147                                                   *
+00050	C * POINT NAME PREFIX: GVL.CPPD.EF147.                                         *
+00052	C *                                                                            *
+00054	C  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+00056	C
+00058	C VER  DATE         TOOL         INITIALS     CS
+00060	C 1.0  07/29/2022   CT           LHH          INITIAL PROGRAMMING
+00062	C 1.1  07/29/2022   CT           LHH          TESTED PROGRAM AND TUNED SYSTEM
+00064	C 1.2  MM/DD/YYYY   Desigo CC                 ADJUSTED TIMERS FOR CUSTOMER
+00066	C TRENDED ALL POINTS
+00095	C
+00096	C ----- DEFINE NAMES, CREATE LOCAL POINTS -----
+00099	C
+00100	DEFINE (X, "GVL.CPPD.EF147.")
+00110	C
+00597	C
+00598	C ----- RESIDENT POINT DEFINITIONS -----
+00599	C     - USED RESIDENT POINTS & THE FIRST LINE IT OCCURRED IN -
+00600	C     - $LOC1,  IS NOT USED -
+00601	C     - $LOC2,  IS NOT USED -
+00602	C     - $LOC3,  IS NOT USED -
+00603	C     - $LOC4,  IS NOT USED -
+00604	C     - $LOC5,  IS NOT USED -
+00605	C     - $LOC6,  IS NOT USED -
+00606	C     - $LOC7,  IS NOT USED -
+00607	C     - $LOC8,  IS NOT USED -
+00608	C     - $LOC9,  IS NOT USED -
+00609	C     - $LOC10, IS NOT USED -
+00610	C     - $LOC11, IS NOT USED -
+00611	C     - $LOC12, IS NOT USED -
+00612	C     - $LOC13, IS NOT USED -
+00613	C     - $LOC14, IS NOT USED -
+00614	C     - $LOC15, IS NOT USED -
+00615	C
+00620	C     - SECNDS, NOT USED -
+00623	C     - SECND1, NOT USED -
+00626	C     - SECND2, NOT USED -
+00628	C     - SECND3, NOT USED -
+00630	C     - SECND4, NOT USED -
+00632	C     - SECND5, NOT USED -
+00633	C     - SECND6, NOT USED -
+00634	C     - SECND7, NOT USED -
+00694	C
+00990	C
+01000	C     - START WHEN ROOM TEMP IS OCCUPIED -
+01010	C
+01020	SAMPLE (30) IF ("BAC_706201_MV_XXX" .EQ. XX) THEN ON ("GVL.CPPD.EF147.OCC") ELSE OFF ("GVL.CPPD.EF147.OCC")
+01030	C
+01040	IF ("GVL.CPPD.EF147.OCC" .EQ. ON) THEN ON ("GVL.CPPD.EF147.SS") ELSE OFF ("GVL.CPPD.EF147.SS")
+01050	C
+01060	IF ("GVL.CPPD.EF147.SS" .EQ. ON) THEN SET ("GVL.CPPD.EF148.SPD.SP", "GVL.CPPD.EF148.SPD") ELSE SET (0.0, "GVL.CPPD.EF148.SPD")
+01070	C
+01080	C
+32700	GOTO 100`;
+
+const SAMPLE_EF148 = String.raw`00010	C EF148
+00014	C  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+00016	C * WARRANTY                                                                   *
+00018	C * THIS PROGRAM WAS CREATED BY SIEMENS                                        *
+00020	C * ANY MODIFICATION TO THIS PROGRAM MAY VOID THE WARRANTY                     *
+00022	C * PLEASE CONTACT YOUR SIEMENS REPRESENTATIVE FOR SERVICE                     *
+00024	C *                                                                            *
+00026	C * Siemens                                                                    *
+00028	C * JOB NAME:          Gainesville Correct Patient                             *
+00030	C * JOB NUMBER:        44OP-335165                                             *
+00032	C * DESCRIPTION:                                                               *
+00034	C * ADDRESS:                                                                   *
+00036	C * CITY:                                                                      *
+00038	C * STATE:                                                                     *
+00040	C * COUNTRY:                                                                   *
+00042	C * PHONE:                                                                     *
+00046	C * NOTES:                                                                     *
+00048	C * SYSTEM NAME:       EF148                                                   *
+00050	C * POINT NAME PREFIX: GVL.CPPD.EF148.                                         *
+00052	C *                                                                            *
+00054	C  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+00056	C
+00058	C VER  DATE         TOOL         INITIALS     CS
+00060	C 1.0  07/29/2022   CT           LHH          INITIAL PROGRAMMING
+00062	C 1.1  07/29/2022   CT           LHH          TESTED PROGRAM AND TUNED SYSTEM
+00064	C 1.2  MM/DD/YYYY   Desigo CC                 ADJUSTED TIMERS FOR CUSTOMER
+00066	C TRENDED ALL POINTS
+00095	C
+00096	C ----- DEFINE NAMES, CREATE LOCAL POINTS -----
+00099	C
+00100	DEFINE (X, "GVL.CPPD.EF148.")
+00110	C
+00597	C
+00598	C ----- RESIDENT POINT DEFINITIONS -----
+00599	C     - USED RESIDENT POINTS & THE FIRST LINE IT OCCURRED IN -
+00600	C     - $LOC1,  IS NOT USED -
+00601	C     - $LOC2,  IS NOT USED -
+00602	C     - $LOC3,  IS NOT USED -
+00603	C     - $LOC4,  IS NOT USED -
+00604	C     - $LOC5,  IS NOT USED -
+00605	C     - $LOC6,  IS NOT USED -
+00606	C     - $LOC7,  IS NOT USED -
+00607	C     - $LOC8,  IS NOT USED -
+00608	C     - $LOC9,  IS NOT USED -
+00609	C     - $LOC10, IS NOT USED -
+00610	C     - $LOC11, IS NOT USED -
+00611	C     - $LOC12, IS NOT USED -
+00612	C     - $LOC13, IS NOT USED -
+00613	C     - $LOC14, IS NOT USED -
+00614	C     - $LOC15, IS NOT USED -
+00615	C
+00620	C     - SECNDS, NOT USED -
+00623	C     - SECND1, NOT USED -
+00626	C     - SECND2, NOT USED -
+00628	C     - SECND3, NOT USED -
+00630	C     - SECND4, NOT USED -
+00632	C     - SECND5, NOT USED -
+00633	C     - SECND6, NOT USED -
+00634	C     - SECND7, NOT USED -
+00694	C
+00990	C
+01000	C     - START WHEN ROOM TEMP IS OCCUPIED -
+01010	C
+01020	SAMPLE (30) IF ("BAC_706202_MV_XXX" .EQ. XX) THEN ON ("GVL.CPPD.EF148.OCC") ELSE OFF ("GVL.CPPD.EF148.OCC")
+01030	C
+01040	IF ("GVL.CPPD.EF148.OCC" .EQ. ON) THEN ON ("GVL.CPPD.EF148.SS") ELSE OFF ("GVL.CPPD.EF148.SS")
+01050	C
+01060	IF ("GVL.CPPD.EF148.SS" .EQ. ON) THEN SET ("GVL.CPPD.EF148.SPD.SP", "GVL.CPPD.EF148.SPD") ELSE SET (0.0, "GVL.CPPD.EF148.SPD")
+01070	C
+01080	C
+32700	GOTO 100`;
+
 /* =================== PARSER =================== */
 let macros={};               // DEFINE name -> value (e.g. X -> "GVL.B1.AHU65.")
 let prefix='';               // the dominant point-name prefix, for short display names
@@ -788,9 +1103,14 @@ function roleOf(name){ const p=points.get(name); if(!p) return 'intern';
   if(r===0 && w>0) return 'out';
   return 'intern';
 }
-function disp(name){ return name.startsWith(prefix)?name.slice(prefix.length):name; }
+let dispOwn='', dispJob='';   // own program namespace + project job prefix, for short names
+function disp(name){
+  if(dispOwn && name.startsWith(dispOwn)) return name.slice(dispOwn.length); // local point → "CCV"
+  if(dispJob && name.startsWith(dispJob)) return name.slice(dispJob.length);  // sibling/campus → "AHU7.RSD"
+  return name;
+}
 function prefixed(short){ // best-effort: find a point whose short name matches
-  for(const n of points.keys()) if(disp(n)===short) return n; return prefix+short; }
+  for(const n of points.keys()) if(disp(n)===short) return n; return dispOwn+short; }
 
 /* =================== RENDER: point list =================== */
 const $=id=>document.getElementById(id);
@@ -969,28 +1289,103 @@ function closeModal(){ $('modal').classList.remove('show'); }
 $('modalLoad').onclick=()=>{ const txt=$('modalText').value.trim(); if(txt){ loadProgram(txt); } closeModal(); };
 $('srcBtn').onclick=openSource; $('pasteBtn').onclick=openPaste;
 
+/* =================== campus / multi-panel =================== */
+const LIBRARY = {
+  AHU7:   typeof SAMPLE_AHU7!=='undefined'?SAMPLE_AHU7:'',
+  DAMPERS:typeof SAMPLE_DAMPERS!=='undefined'?SAMPLE_DAMPERS:'',
+  EF101:  typeof SAMPLE_EF101!=='undefined'?SAMPLE_EF101:'',
+  EF147:  typeof SAMPLE_EF147!=='undefined'?SAMPLE_EF147:'',
+  EF148:  typeof SAMPLE_EF148!=='undefined'?SAMPLE_EF148:'',
+  AHU65:  SAMPLE_PROGRAM,
+};
+const PROJECTS = [
+  { name:'Gainesville Correct Patient', job:'GVL.CPPD.', programs:['AHU7','DAMPERS','EF101','EF147','EF148'] },
+  { name:'Gainesville Clinical Lab',    job:'GVL.B1.',   programs:['AHU65'] },
+];
+let currentProg='AHU7';
+const projectOf = name => PROJECTS.find(p=>p.programs.includes(name));
+const nsOf = (proj,name) => proj.job + name + '.';
+const campusCache = {};
+function buildCampus(proj){
+  if(campusCache[proj.name]) return campusCache[proj.name];
+  const models={};
+  proj.programs.forEach(nm=>{ if(!LIBRARY[nm])return; analyze(LIBRARY[nm]);
+    const refs=[]; points.forEach((p,pt)=>{ if(KEYWORDS.has(pt))return;
+      refs.push({pt, w:p.writes.length>0, r:p.reads.length>0}); });
+    models[nm]={name:nm, refs}; });
+  campusCache[proj.name]=models;
+  analyze(LIBRARY[currentProg]); // restore globals to the active program
+  return models;
+}
+function ownerOf(proj, pt){
+  for(const nm of proj.programs){ if(pt.startsWith(nsOf(proj,nm))) return nm; }
+  if(pt.startsWith('SITE.')) return 'SITE';
+  if(/^BAC[_-]/i.test(pt)) return 'BACnet';
+  if(pt.startsWith(proj.job)) return 'shared';
+  return null;
+}
+function renderCrossRefs(){
+  const proj=projectOf(currentProg);
+  if(!proj || proj.programs.length<2){ $('crossWrap').style.display='none'; return; }
+  const models=buildCampus(proj); const me=nsOf(proj,currentProg);
+  // outgoing — current program references points owned by OTHER programs
+  const outMap={};
+  points.forEach((p,pt)=>{ if(KEYWORDS.has(pt))return; const o=ownerOf(proj,pt);
+    if(o && o!==currentProg && proj.programs.includes(o)){
+      (outMap[o]=outMap[o]||{cmd:[],mon:[]})[p.writes.length?'cmd':'mon'].push(disp2(proj,pt)); } });
+  // incoming — other programs reference THIS program's points
+  const inMap={};
+  proj.programs.forEach(nm=>{ if(nm===currentProg)return; (models[nm]||{refs:[]}).refs.forEach(r=>{
+    if(r.pt.startsWith(me)){ (inMap[nm]=inMap[nm]||{cmd:[],mon:[]})[r.w?'cmd':'mon'].push(disp2(proj,r.pt)); } }); });
+
+  const edge=(a,b,kind,pts)=>`<div class="xedge" onclick="gotoProgram('${kind==='out'?b:a}')">
+      <div class="xt">${esc(a)} <span class="arrow2">→</span> ${esc(b)}
+        <span class="dir ${pts.cmdMon}">${pts.label}</span></div>
+      <div class="pts">${pts.list.map(esc).join(' · ')}</div></div>`;
+  let html='';
+  const outKeys=Object.keys(outMap);
+  if(outKeys.length){ html+=`<div class="xgrp"><div class="xh">${esc(currentProg)} depends on…</div>`;
+    outKeys.forEach(o=>{ const g=outMap[o];
+      if(g.cmd.length) html+=edge(currentProg,o,'out',{cmdMon:'cmd',label:'commands',list:g.cmd});
+      if(g.mon.length) html+=edge(currentProg,o,'out',{cmdMon:'mon',label:'monitors',list:g.mon}); });
+    html+='</div>'; }
+  const inKeys=Object.keys(inMap);
+  if(inKeys.length){ html+=`<div class="xgrp"><div class="xh">…depends on ${esc(currentProg)}</div>`;
+    inKeys.forEach(f=>{ const g=inMap[f];
+      if(g.cmd.length) html+=edge(f,currentProg,'in',{cmdMon:'cmd',label:'commands',list:g.cmd});
+      if(g.mon.length) html+=edge(f,currentProg,'in',{cmdMon:'mon',label:'monitors',list:g.mon}); });
+    html+='</div>'; }
+  $('crossRefs').innerHTML = html || '<div style="color:var(--dim);font-size:11px">No references to or from sibling panels.</div>';
+  $('crossWrap').style.display='';
+}
+function disp2(proj,pt){ // show point without the long job prefix
+  return pt.startsWith(proj.job)?pt.slice(proj.job.length):pt; }
+function gotoProgram(name){ if(!LIBRARY[name])return; $('sampleSel').value=name; loadProgramByName(name); }
+
 /* =================== boot =================== */
 let SAMPLE_PROGRAM_CURRENT=SAMPLE_PROGRAM;
-function loadProgram(src){
+function loadProgram(src, ctx){
   SAMPLE_PROGRAM_CURRENT=src; analyze(src);
-  $('panelName').textContent = macros['X'] ? macros['X'].replace(/\.$/,'') : 'unknown';
+  dispOwn = ctx ? ctx.own : (macros['X']||prefix||'');
+  dispJob = ctx ? ctx.job : dispOwn.replace(/[^.]+\.$/,'');   // strip last segment → job prefix
+  $('panelName').textContent = ctx ? ctx.label : (macros['X'] ? macros['X'].replace(/\.$/,'') : 'unknown');
   selected=null; $('insEmpty').style.display=''; $('insBody').style.display='none';
-  renderList(); renderFlags();
+  renderList(); renderFlags(); renderCrossRefs();
 }
+function loadProgramByName(name){ currentProg=name; const proj=projectOf(name);
+  loadProgram(LIBRARY[name], proj?{own:proj.job+name+'.', job:proj.job, label:proj.job+name}:null); }
 $('search').addEventListener('input',e=>renderList(e.target.value));
 function esc(s){ return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
 function pad(n){ return String(n).padStart(5,'0'); }
 
-/* sample panels (extracted from real Siemens PXC exports) */
-const SAMPLES = {
-  'AHU-7 · Correct Patient (enthalpy econ + GOSUB)': typeof SAMPLE_AHU7!=='undefined'?SAMPLE_AHU7:'',
-  'AHU-65 · Clinical Lab': SAMPLE_PROGRAM,
-};
+/* panel selector grouped by project */
 const sel=$('sampleSel');
-Object.keys(SAMPLES).forEach(k=>{ const o=document.createElement('option'); o.value=k; o.textContent=k; sel.appendChild(o); });
-sel.onchange=()=>loadProgram(SAMPLES[sel.value]);
+PROJECTS.forEach(proj=>{ const og=document.createElement('optgroup'); og.label=proj.name;
+  proj.programs.forEach(nm=>{ const o=document.createElement('option'); o.value=nm; o.textContent=nm; og.appendChild(o); });
+  sel.appendChild(og); });
+sel.onchange=()=>loadProgramByName(sel.value);
 
-loadProgram(SAMPLES[Object.keys(SAMPLES)[0]]);
+loadProgramByName('AHU7');
 
 // test/debug accessor (function declaration → reachable from page.evaluate)
 function __state(){ return {prog, points, reachable, lineMap, KEYWORDS, roleOf, prefixed, disp}; }
