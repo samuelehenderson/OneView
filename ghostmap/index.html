@@ -113,6 +113,8 @@
   <span class="file">panel <b id="panelName">—</b></span>
   <select id="sampleSel" class="btn" style="appearance:auto" title="Load a sample panel"></select>
   <button class="btn" id="srcBtn">View source</button>
+  <input type="file" id="fileInput" accept=".pcl,.txt,.P2,.p2,.pcm" style="display:none">
+  <button class="btn" id="openFileBtn" title="Open a .pcl listing or a .P2 panel backup">Open file…</button>
   <button class="btn primary" id="pasteBtn">Paste PPCL…</button>
 </header>
 
@@ -159,6 +161,7 @@
   </div>
 </div>
 
+<script src="p2.js"></script>
 <script>
 "use strict";
 /* ===========================================================================
@@ -1290,7 +1293,7 @@ $('modalLoad').onclick=()=>{ const txt=$('modalText').value.trim(); if(txt){ loa
 $('srcBtn').onclick=openSource; $('pasteBtn').onclick=openPaste;
 
 /* =================== campus / multi-panel =================== */
-const LIBRARY = {
+let LIBRARY = {
   AHU7:   typeof SAMPLE_AHU7!=='undefined'?SAMPLE_AHU7:'',
   DAMPERS:typeof SAMPLE_DAMPERS!=='undefined'?SAMPLE_DAMPERS:'',
   EF101:  typeof SAMPLE_EF101!=='undefined'?SAMPLE_EF101:'',
@@ -1298,7 +1301,7 @@ const LIBRARY = {
   EF148:  typeof SAMPLE_EF148!=='undefined'?SAMPLE_EF148:'',
   AHU65:  SAMPLE_PROGRAM,
 };
-const PROJECTS = [
+let PROJECTS = [
   { name:'Gainesville Correct Patient', job:'GVL.CPPD.', programs:['AHU7','DAMPERS','EF101','EF147','EF148'] },
   { name:'Gainesville Clinical Lab',    job:'GVL.B1.',   programs:['AHU65'] },
 ];
@@ -1380,10 +1383,38 @@ function pad(n){ return String(n).padStart(5,'0'); }
 
 /* panel selector grouped by project */
 const sel=$('sampleSel');
-PROJECTS.forEach(proj=>{ const og=document.createElement('optgroup'); og.label=proj.name;
-  proj.programs.forEach(nm=>{ const o=document.createElement('option'); o.value=nm; o.textContent=nm; og.appendChild(o); });
-  sel.appendChild(og); });
+function rebuildSelector(){ sel.innerHTML='';
+  PROJECTS.forEach(proj=>{ const og=document.createElement('optgroup'); og.label=proj.name;
+    proj.programs.forEach(nm=>{ const o=document.createElement('option'); o.value=nm; o.textContent=nm; og.appendChild(o); });
+    sel.appendChild(og); }); }
+rebuildSelector();
 sel.onchange=()=>loadProgramByName(sel.value);
+
+/* ---- open a .pcl listing or a .P2 panel backup from disk ---- */
+function jobPrefixFor(programs){ // find "<job>.<name>." in a program's own source
+  for(const p of programs){ const m=p.src.match(new RegExp('"([A-Za-z0-9_.]*?\\.)'+p.name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\.')); if(m) return m[1]; }
+  const m=(programs[0]?.src||'').match(/"([A-Za-z0-9_]+\.[A-Za-z0-9_]+\.)/); return m?m[1]:''; }
+function openWorkspace(projName, programs){ // programs: [{name, src}]
+  if(!programs.length){ flash&&0; alert('No PPCL programs found in that file.'); return; }
+  LIBRARY={}; programs.forEach(p=>{ LIBRARY[p.name]=p.src; });
+  PROJECTS=[{ name:projName, job:jobPrefixFor(programs), programs:programs.map(p=>p.name) }];
+  Object.keys(campusCache).forEach(k=>delete campusCache[k]);
+  rebuildSelector(); loadProgramByName(programs[0].name);
+}
+$('openFileBtn').onclick=()=>$('fileInput').click();
+$('fileInput').onchange=async e=>{ const file=e.target.files[0]; if(!file)return;
+  const base=file.name.replace(/\.[^.]+$/,'');
+  try{
+    if(/\.(p2|pcm)$/i.test(file.name)){
+      const progs=extractP2(await file.arrayBuffer());
+      openWorkspace(base, progs.map(p=>({name:p.name, src:p.source})));
+    } else {
+      const txt=await file.text();
+      openWorkspace(base, [{name:base, src:txt}]);
+    }
+  } catch(err){ alert('Could not read that file: '+err.message); }
+  e.target.value='';
+};
 
 loadProgramByName('AHU7');
 

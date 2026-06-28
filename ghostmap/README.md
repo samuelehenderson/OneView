@@ -83,15 +83,20 @@ that boundary become campus edges (with direction: *commands* vs *monitors*).
 ### Pulling PPCL out of a panel backup
 
 A clean `.pcl` listing is the easy case. Real panel backups are often **PXC-Modular `.P2`
-database exports** — hex-encoded, record-framed binary. [`tools/extract_p2.py`](./tools/extract_p2.py)
-decodes one into clean per-program `.pcl` files:
+database exports** — hex-encoded, record-framed binary (0x16-prefixed records, ASCII-hex
+payloads, TLV fields). GhostMap reads them **directly in the browser**: click **Open file…**
+and pick a `.pcl` listing *or* a `.P2` backup — a `.P2` is decoded client-side and every
+program it contains becomes a panel in the workspace.
+
+Same decoder is available as a CLI ([`tools/extract_p2.py`](./tools/extract_p2.py)) and a
+browser module ([`p2.js`](./p2.js), `extractP2(bytes)`):
 
 ```
 python3 tools/extract_p2.py PANEL.P2 samples/
 ```
 
-(The AHU-7 sample and its sibling programs — `DAMPERS`, `EF101/147/148` — were extracted
-from one such `.P2` with this tool.)
+(The AHU-7 sample and its siblings — `DAMPERS`, `EF101/147/148` — were extracted from one
+real `.P2` this way; the in-browser decoder produces byte-identical output.)
 
 ## How the engine works
 
