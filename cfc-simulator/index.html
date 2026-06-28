@@ -440,12 +440,13 @@ function buildBlocks(){
     const sel=selBlock===b.id;
     el('rect',{x:b.x,y:b.y,width:W,height:h,rx:7,fill:'var(--panel2)',
       stroke:sel?'var(--sel)':'var(--line)','stroke-width':sel?2:1.2}, g);
-    // header (drag handle)
+    // header (drag handle) — green for I/O & constants, purple for function blocks
+    const isIO = !!(def.control||def.sink);
+    const hdrFill = isIO ? '#1f7a46' : '#5b3bc4';
     const hdr=el('rect',{x:b.x,y:b.y,width:W,height:HDR,rx:7,
-      fill:def.sink?'#2a2030':def.control?'#1d2b22':'#202a38',
-      stroke:'none', style:'cursor:move'}, g);
-    el('rect',{x:b.x,y:b.y+HDR-7,width:W,height:7,fill:def.sink?'#2a2030':def.control?'#1d2b22':'#202a38'},g);
-    const title=el('text',{x:b.x+8,y:b.y+15,fill:'var(--ink)','font-size':12,'font-weight':600,style:'cursor:move'},g);
+      fill:hdrFill, stroke:'none', style:'cursor:move'}, g);
+    el('rect',{x:b.x,y:b.y+HDR-7,width:W,height:7,fill:hdrFill},g);
+    const title=el('text',{x:b.x+8,y:b.y+15,fill:'#fff','font-size':12,'font-weight':600,style:'cursor:move'},g);
     title.textContent=def.title + (b.name?(' · '+b.name):'');
     hdr.addEventListener('pointerdown',ev=>startDrag(ev,b));
     title.addEventListener('pointerdown',ev=>startDrag(ev,b));
@@ -455,13 +456,13 @@ function buildBlocks(){
     def.inputs.forEach((p,i)=>{
       const y=pinY(b,i);
       drawPin(g,b,'in',p,b.x,y);
-      const tx=el('text',{x:b.x+12,y:y+4,fill:'var(--dim)','font-size':11},g); tx.textContent=p.n;
+      const tx=el('text',{x:b.x+15,y:y+4,fill:'#aeb8c6','font-size':11},g); tx.textContent=p.n;
     });
     // output pins + live value
     def.outputs.forEach((p,i)=>{
       const y=pinY(b,i);
       drawPin(g,b,'out',p,b.x+W,y);
-      const tx=el('text',{x:b.x+W-12,y:y+4,fill:'var(--dim)','font-size':11,'text-anchor':'end'},g);
+      const tx=el('text',{x:b.x+W-15,y:y+4,fill:'#aeb8c6','font-size':11,'text-anchor':'end'},g);
       tx.textContent=p.n;
       const vx=el('text',{id:'ov_'+b.id+'_'+p.n, x:b.x+W-12,y:y+4,
         fill:p.t===T_BOOL?'#fcd34d':'#93c5fd','font-size':11,'text-anchor':'end','font-weight':600,
@@ -475,14 +476,16 @@ function buildBlocks(){
   });
 }
 function drawPin(g,b,io,p,x,y){
-  const c=el('circle',{id:'pin_'+b.id+'_'+io+'_'+p.n, cx:x,cy:y,r:PINR,
+  // square "nub" seated centered on the block border
+  const s=9;
+  const c=el('rect',{id:'pin_'+b.id+'_'+io+'_'+p.n, x:x-s/2,y:y-s/2,width:s,height:s,rx:2.5,
     fill: p.t===T_BOOL?'#5b4a25':'#1e3a5f', stroke:p.t===T_BOOL?'#f59e0b':'#3b82f6',
     'stroke-width':1.5, style:'cursor:crosshair'},g);
   c.addEventListener('pointerdown',ev=>{ev.stopPropagation();
     if(io==='out') startWire(ev,b,p); });
   c.addEventListener('pointerup',ev=>{ if(io==='in') completeWire(ev,b,p); });
   // larger invisible hit area
-  const hit=el('circle',{cx:x,cy:y,r:10,fill:'transparent',style:'cursor:crosshair'},g);
+  const hit=el('circle',{cx:x,cy:y,r:11,fill:'transparent',style:'cursor:crosshair'},g);
   hit.addEventListener('pointerdown',ev=>{ev.stopPropagation(); if(io==='out') startWire(ev,b,p);});
   hit.addEventListener('pointerup',ev=>{ if(io==='in') completeWire(ev,b,p); });
 }
