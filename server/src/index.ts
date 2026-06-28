@@ -211,16 +211,18 @@ app.get('/uploads/:id', ah(async (req, res) => {
   res.send(u.data)
 }))
 
-// ---- Static: built frontend (production) ------------------------------------
+// ---- Static: serve the GhostMap app (the product) ---------------------------
+// GhostMap is a self-contained static app; the API above is its system-of-record.
 
+const ghostmap = join(__dirname, '..', '..', 'ghostmap')
 const dist = join(__dirname, '..', '..', 'dist')
-if (existsSync(dist)) {
-  app.use(express.static(dist))
-  // SPA fallback for client-side routes, but let unknown /api paths 404 as JSON.
+const appDir = existsSync(ghostmap) ? ghostmap : (existsSync(dist) ? dist : null)
+if (appDir) {
+  app.use(express.static(appDir))
   app.get('*', (req, res, next) => {
     if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) return next()
-    res.sendFile(join(dist, 'index.html'))
+    res.sendFile(join(appDir, 'index.html'))
   })
 }
 
-app.listen(PORT, () => console.log(`OneView API listening on http://localhost:${PORT}`))
+app.listen(PORT, () => console.log(`GhostMap API + app listening on http://localhost:${PORT}`))

@@ -116,6 +116,9 @@
   <input type="file" id="fileInput" accept=".pcl,.txt,.P2,.p2,.pcm" style="display:none">
   <button class="btn" id="openFileBtn" title="Open a .pcl listing or a .P2 panel backup">Open file…</button>
   <button class="btn primary" id="pasteBtn">Paste PPCL…</button>
+  <span style="width:1px;height:22px;background:var(--line);margin:0 2px"></span>
+  <span id="cloud" style="display:flex;align-items:center;gap:6px"></span>
+  <span id="cloudMsg" style="color:var(--ok);font-size:11px"></span>
 </header>
 
 <div id="list">
@@ -1403,7 +1406,7 @@ function openWorkspace(projName, programs){ // programs: [{name, src}]
 }
 $('openFileBtn').onclick=()=>$('fileInput').click();
 $('fileInput').onchange=async e=>{ const file=e.target.files[0]; if(!file)return;
-  const base=file.name.replace(/\.[^.]+$/,'');
+  const base=file.name.replace(/\.[^.]+$/,'').replace(/^[0-9a-f]{6,}-/i,''); // drop upload hash
   try{
     if(/\.(p2|pcm)$/i.test(file.name)){
       const progs=extractP2(await file.arrayBuffer());
@@ -1418,8 +1421,76 @@ $('fileInput').onchange=async e=>{ const file=e.target.files[0]; if(!file)return
 
 loadProgramByName('AHU7');
 
+/* =================== cloud: auth + saved buildings (system-of-record) ========
+   Talks to the same-origin GhostMap API. A "building" is a project whose JSON
+   blob is { kind:'ghostmap', programs:[{name, source}] } — so the existing
+   authed /api/projects store persists GhostMap workspaces with zero changes. */
+let auth = { token: localStorage.getItem('gm_token')||'', email: localStorage.getItem('gm_email')||'' };
+let buildings = [], currentBuilding = null;
+async function api(path, opts={}){
+  opts.headers = Object.assign({'content-type':'application/json'},
+    auth.token?{authorization:'Bearer '+auth.token}:{}, opts.headers||{});
+  const r = await fetch(path, opts); const b = await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error(b.error||('HTTP '+r.status)); return b;
+}
+function cloudMsg(m){ const e=$('cloudMsg'); if(!e)return; e.textContent=m; setTimeout(()=>{ if(e.textContent===m)e.textContent=''; },2500); }
+const fld='background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:5px 7px;font-size:12px;width:120px';
+function renderCloud(){
+  const c=$('cloud'); if(!c) return;
+  if(!auth.token){
+    c.innerHTML=`<input id="cEmail" placeholder="email" style="${fld}">
+      <input id="cPw" type="password" placeholder="password" style="${fld};width:96px">
+      <button class="btn" id="cLogin">Sign in</button><button class="btn" id="cReg">Register</button>`;
+    $('cLogin').onclick=()=>doAuth('login'); $('cReg').onclick=()=>doAuth('register');
+    [$('cEmail'),$('cPw')].forEach(i=>i.onkeydown=e=>{ if(e.key==='Enter')doAuth('login'); });
+  } else {
+    c.innerHTML=`<select id="cBuildings" class="btn" style="appearance:auto;max-width:180px"></select>
+      <button class="btn" id="cSave" title="Save current panels to this building">☁ Save</button>
+      <button class="btn" id="cNew">New</button>
+      <span style="color:var(--dim);font-size:11px">${esc(auth.email)}</span>
+      <button class="btn" id="cOut">Sign out</button>`;
+    fillBuildings();
+    $('cSave').onclick=saveBuilding; $('cNew').onclick=newBuilding; $('cOut').onclick=signOut;
+    $('cBuildings').onchange=()=>openBuilding($('cBuildings').value);
+  }
+}
+async function doAuth(kind){
+  const email=$('cEmail').value.trim(), password=$('cPw').value;
+  if(!email||!password){ cloudMsg('email + password required'); return; }
+  try{ const b=await api('/api/auth/'+kind,{method:'POST',body:JSON.stringify({email,name:email,password})});
+    auth={token:b.token,email:b.user.email}; localStorage.setItem('gm_token',auth.token); localStorage.setItem('gm_email',auth.email);
+    renderCloud(); await loadBuildings(); cloudMsg('signed in'); }
+  catch(e){ cloudMsg(e.message); }
+}
+function signOut(){ auth={token:'',email:''}; localStorage.removeItem('gm_token'); localStorage.removeItem('gm_email');
+  buildings=[]; currentBuilding=null; renderCloud(); }
+async function loadBuildings(){
+  try{ const b=await api('/api/projects');
+    buildings=b.projects.filter(p=>p.building&&p.building.kind==='ghostmap'); fillBuildings(); }catch(e){}
+}
+function fillBuildings(){ const s=$('cBuildings'); if(!s)return;
+  s.innerHTML='<option value="">— saved buildings —</option>'+
+    buildings.map(b=>`<option value="${b.id}">${esc(b.name)}</option>`).join('');
+  if(currentBuilding) s.value=currentBuilding;
+}
+function openBuilding(id){ const b=buildings.find(x=>x.id===id); if(!b)return; currentBuilding=id;
+  openWorkspace(b.name, (b.building.programs||[]).map(p=>({name:p.name,src:p.source}))); }
+async function saveBuilding(){
+  const proj=PROJECTS[0]; const programs=proj.programs.map(n=>({name:n, source:LIBRARY[n]}));
+  const building={kind:'ghostmap', job:proj.job, programs};
+  try{
+    if(!currentBuilding){ const b=await api('/api/projects',{method:'POST',body:JSON.stringify({name:proj.name})}); currentBuilding=b.project.id; }
+    await api('/api/projects/'+currentBuilding,{method:'PUT',body:JSON.stringify({building})});
+    await loadBuildings(); cloudMsg('saved to cloud');
+  }catch(e){ cloudMsg(e.message); }
+}
+async function newBuilding(){ const name=prompt('New building name:'); if(!name)return;
+  try{ const b=await api('/api/projects',{method:'POST',body:JSON.stringify({name})});
+    currentBuilding=b.project.id; await saveBuilding(); }catch(e){ cloudMsg(e.message); } }
+renderCloud(); if(auth.token) loadBuildings();
+
 // test/debug accessor (function declaration → reachable from page.evaluate)
-function __state(){ return {prog, points, reachable, lineMap, KEYWORDS, roleOf, prefixed, disp}; }
+function __state(){ return {prog, points, reachable, lineMap, KEYWORDS, roleOf, prefixed, disp, auth, buildings}; }
 </script>
 </body>
 </html>
