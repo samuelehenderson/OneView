@@ -1,18 +1,18 @@
-# Render Blueprint for OneView (free web service + external free Postgres).
+# Render Blueprint for GhostMap (free web service + external free Postgres).
 # Deploy: push to GitHub, then Render → New → Blueprint, pick the repo.
 #
+# The Express server serves the GhostMap static app AND its JSON/Postgres API.
 # Persistence: the web service filesystem is wiped on every deploy/restart, so all data
-# (accounts, projects, uploaded floor plans) lives in PostgreSQL. We use a free Neon
-# database (https://neon.tech) which stays free indefinitely — set DATABASE_URL to its
-# connection string in the Render dashboard (Environment tab) after the first deploy.
-#
-# (Render's own free Postgres works too but expires after ~30 days; Neon/Supabase don't.)
+# (accounts, saved buildings/programs) lives in PostgreSQL. We use a free Neon database
+# (https://neon.tech), which stays free indefinitely — set DATABASE_URL to its connection
+# string in the Render dashboard (Environment tab) after the first deploy. Without it the
+# server falls back to a local JSON file (fine for a quick look, not for persistence).
 services:
   - type: web
-    name: oneview
+    name: ghostmap
     runtime: node
     plan: free
-    buildCommand: npm install && npm run build
+    buildCommand: npm install
     startCommand: npm start
     healthCheckPath: /api/health
     envVars:

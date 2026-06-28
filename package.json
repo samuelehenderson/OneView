@@ -1,16 +1,15 @@
 {
-  "name": "oneview",
+  "name": "ghostmap",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.0",
   "type": "module",
-  "description": "OneView — a building progress & turnover tracker",
+  "description": "GhostMap — reverse-engineer a building from its control program (Siemens PPCL static analysis)",
   "scripts": {
-    "dev": "concurrently -n web,api -c blue,green \"vite\" \"tsx watch server/src/index.ts --port 8787\"",
-    "web": "vite",
+    "dev": "tsx watch server/src/index.ts --port 8787",
     "server": "tsx watch server/src/index.ts --port 8787",
-    "build": "tsc -b && vite build",
     "start": "tsx server/src/index.ts",
-    "preview": "vite preview"
+    "build": "echo \"GhostMap is a static app served by the API server — no build step\"",
+    "typecheck": "tsc -p tsconfig.server.json"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -19,11 +18,7 @@
     "jsonwebtoken": "^9.0.2",
     "multer": "^1.4.5-lts.1",
     "pg": "^8.22.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "react-router-dom": "^6.26.2",
-    "tsx": "^4.19.1",
-    "xlsx": "^0.18.5"
+    "tsx": "^4.19.1"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
@@ -33,12 +28,7 @@
     "@types/multer": "^1.4.12",
     "@types/node": "^22.7.4",
     "@types/pg": "^8.20.0",
-    "@types/react": "^18.3.11",
-    "@types/react-dom": "^18.3.0",
-    "@vitejs/plugin-react": "^4.3.2",
-    "concurrently": "^9.0.1",
-    "typescript": "^5.6.2",
-    "vite": "^5.4.8"
+    "typescript": "^5.6.2"
   },
   "engines": {
     "node": ">=20"
