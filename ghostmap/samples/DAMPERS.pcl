@@ -1,0 +1,83 @@
+00010	C DAMPERS
+00014	C  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+00016	C * WARRANTY                                                                   *
+00018	C * THIS PROGRAM WAS CREATED BY SIEMENS                                        *
+00020	C * ANY MODIFICATION TO THIS PROGRAM MAY VOID THE WARRANTY                     *
+00022	C * PLEASE CONTACT YOUR SIEMENS REPRESENTATIVE FOR SERVICE                     *
+00024	C *                                                                            *
+00026	C * Siemens                                                                    *
+00028	C * JOB NAME:          Gainesville Correct Patient                             *
+00030	C * JOB NUMBER:        44OP-335165                                             *
+00032	C * DESCRIPTION:                                                               *
+00034	C * ADDRESS:                                                                   *
+00036	C * CITY:                                                                      *
+00038	C * STATE:                                                                     *
+00040	C * COUNTRY:                                                                   *
+00042	C * PHONE:                                                                     *
+00046	C * NOTES:                                                                     *
+00048	C * SYSTEM NAME:       DAMPERS                                                 *
+00050	C * POINT NAME PREFIX: GVL.CPPD.DAMPERS.                                       *
+00052	C *                                                                            *
+00054	C  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+00056	C
+00058	C VER  DATE         TOOL         INITIALS     CS
+00060	C 1.0  07/29/2022   CT           LHH          INITIAL PROGRAMMING
+00062	C 1.1  07/29/2022   CT           LHH          TESTED PROGRAM AND TUNED SYSTEM
+00064	C 1.2  MM/DD/YYYY   Desigo CC                 ADJUSTED TIMERS FOR CUSTOMER
+00066	C TRENDED ALL POINTS
+00095	C
+00096	C ----- DEFINE NAMES, CREATE LOCAL POINTS -----
+00099	C
+00100	DEFINE (X, "GVL.CPPD.EF148.")
+00110	C
+00597	C
+00598	C ----- RESIDENT POINT DEFINITIONS -----
+00599	C     - USED RESIDENT POINTS & THE FIRST LINE IT OCCURRED IN -
+00600	C     - $LOC1,  IS NOT USED -
+00601	C     - $LOC2,  IS NOT USED -
+00602	C     - $LOC3,  IS NOT USED -
+00603	C     - $LOC4,  IS NOT USED -
+00604	C     - $LOC5,  IS NOT USED -
+00605	C     - $LOC6,  IS NOT USED -
+00606	C     - $LOC7,  IS NOT USED -
+00607	C     - $LOC8,  IS NOT USED -
+00608	C     - $LOC9,  IS NOT USED -
+00609	C     - $LOC10, IS NOT USED -
+00610	C     - $LOC11, IS NOT USED -
+00611	C     - $LOC12, IS NOT USED -
+00612	C     - $LOC13, IS NOT USED -
+00613	C     - $LOC14, IS NOT USED -
+00614	C     - $LOC15, IS NOT USED -
+00615	C
+00620	C     - SECNDS, NOT USED -
+00623	C     - SECND1, NOT USED -
+00626	C     - SECND2, NOT USED -
+00628	C     - SECND3, NOT USED -
+00630	C     - SECND4, NOT USED -
+00632	C     - SECND5, NOT USED -
+00633	C     - SECND6, NOT USED -
+00634	C     - SECND7, NOT USED -
+00694	C
+00990	C
+01000	C     - CLOSE DAMPERS IF SMOKE IS DETECTED -
+01010	C
+01020	IF ("GVL.CPPD.AHU7.RSD" .EQ. ON .OR. "GVL.CPPD.AHU7.SSD" .EQ. ON) THEN GOTO 3000
+01030	C
+01040	C
+01050	C
+01060	C
+02000	ON ("GVL.CPPD.FD1.DMP")
+02010	ON ("GVL.CPPD.FD2.DMP")
+02020	ON ("GVL.CPPD.FD3.DMP")
+02030	ON ("GVL.CPPD.FD4.DMP")
+02040	C
+02050	GOTO 32700
+02060	C
+03000	OFF ("GVL.CPPD.FD1.DMP")
+03010	OFF ("GVL.CPPD.FD2.DMP")
+03020	OFF ("GVL.CPPD.FD3.DMP")
+03030	OFF ("GVL.CPPD.FD4.DMP")
+03040	C
+03050	C
+03060	C
+32700	GOTO 100

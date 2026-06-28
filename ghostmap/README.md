@@ -54,22 +54,50 @@ what it *affects*.** GhostMap does.
 
 ## Try it
 
-Open `index.html`. It loads a real panel — **GVL.B1.AHU65**, a Siemens-programmed AHU at
-the Gainesville Clinical Lab (the export is in [`samples/AHU65.pcl`](./samples/AHU65.pcl)).
+Open `index.html`. It loads real Siemens-programmed panels (switch between them with the
+panel selector):
 
-- Click **`CCV`** (cooling valve): it's driven **5 ways across 4 modes**.
-- Click **`MAD`** (mixed-air damper): driven by the economizer `MIN()`, and it drives both
-  `OAD` and `RAD`.
-- Use **Paste PPCL…** to drop in your own panel export.
+- **AHU-7** (Gainesville "Correct Patient") — the richer one: enthalpy + dry-bulb
+  economizer, a psychrometric `GOSUB` subroutine, humidification, power-restart handler.
+  Click **`OAE`** (outdoor-air enthalpy) and watch it trace *through the subroutine* back to
+  the raw `OAT`/`OAH` sensors, and forward into the economizer logic.
+- **AHU-65** (Clinical Lab) — click **`CCV`** (cooling valve): driven **5 ways across
+  4 modes**; click **`MAD`**: driven by the economizer `MIN()`, drives `OAD` and `RAD`.
+
+Use **Paste PPCL…** to drop in your own panel export. The samples live in
+[`samples/`](./samples/).
+
+### Pulling PPCL out of a panel backup
+
+A clean `.pcl` listing is the easy case. Real panel backups are often **PXC-Modular `.P2`
+database exports** — hex-encoded, record-framed binary. [`tools/extract_p2.py`](./tools/extract_p2.py)
+decodes one into clean per-program `.pcl` files:
+
+```
+python3 tools/extract_p2.py PANEL.P2 samples/
+```
+
+(The AHU-7 sample and its sibling programs — `DAMPERS`, `EF101/147/148` — were extracted
+from one such `.P2` with this tool.)
 
 ## How the engine works
 
 It parses the real Siemens PPCL dialect — quoted dotted point names, `DEFINE`/`%X%` macros,
-`LOCAL`/`$LOC`/`SECND` locals, the `SAMPLE(n)` modifier, `IF/THEN/ELSE`, `ON`/`OFF`/`SET`,
-`LOOP` (PID), `TABLE` (curves), `MAX`/`MIN`, `GOTO`, and assignments — and for each statement
-resolves which points it **reads** and which it **writes** (e.g. `LOOP`'s 2nd point is the
-output; `TABLE`'s 2nd is the output; `MAX`/`MIN` write their first argument). From that it
-builds:
+`LOCAL`/`$LOC`/`$ARG`/`SECND` locals, the `SAMPLE(n)` modifier, `IF/THEN/ELSE`,
+`ON`/`OFF`/`SET`, `LOOP` (PID), `TABLE` (curves), `MAX`/`MIN`, `DBSWIT` (deadband switch),
+`GOTO`, `GOSUB`/`RETURN`, `ONPWRT`, and assignments — and for each statement resolves which
+points it **reads** and which it **writes** (e.g. `LOOP`'s 2nd point is the output; `TABLE`'s
+2nd is the output; `MAX`/`MIN`/`DBSWIT` write their first/last argument). Two analyses worth
+calling out:
+
+- **Inter-procedural `GOSUB`** — a `GOSUB` passes points by reference into `$ARG1..$ARGn`.
+  GhostMap reads each subroutine to learn which `$ARG`s it *reads* vs *writes*, then resolves
+  every call site's argument **direction** — so a value computed inside a subroutine (e.g.
+  enthalpy) is correctly an output of the caller, not a phantom input.
+- **`ONPWRT` power-restart entry** — its target is treated as a second reachability root, so
+  the power-up handler block isn't falsely flagged as dead code.
+
+From that it builds:
 
 - a **reads/writes graph** over points → the upstream/downstream traces and role
   classification (input / internal / output), and
