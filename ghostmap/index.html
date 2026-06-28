@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>GhostMap — reverse-engineer a building from its PPCL</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#141a22; --panel2:#1b2330; --line:#283242; --ink:#e6edf3;
+    --dim:#8b98a9; --accent:#4ea1ff; --in:#38bdf8; --out:#f472b6; --intern:#a78bfa;
+    --warn:#fbbf24; --bad:#f87171; --ok:#34d399; --code:#cbd5e1;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{font:13px/1.45 "Segoe UI",system-ui,Arial,sans-serif; background:var(--bg); color:var(--ink);
+    overflow:hidden; display:grid; grid-template-rows:auto 1fr; grid-template-columns:290px 1fr 340px;
+    grid-template-areas:"top top top" "list inspect flags";}
+  header{grid-area:top; background:var(--panel); border-bottom:1px solid var(--line);
+    display:flex; align-items:center; gap:10px; padding:8px 14px}
+  header h1{font-size:15px; margin:0; font-weight:700; letter-spacing:.3px}
+  header h1 .gho{color:var(--accent)}
+  header .sub{color:var(--dim); font-size:12px}
+  header .file{margin-left:auto; color:var(--dim); font-size:12px}
+  header .file b{color:var(--ink); font-family:ui-monospace,Consolas,monospace}
+  .btn{background:var(--panel2); color:var(--ink); border:1px solid var(--line); padding:6px 11px;
+    border-radius:6px; cursor:pointer; font-size:12px}
+  .btn:hover{border-color:var(--accent)}
+  .btn.primary{background:#143b5e; border-color:var(--accent)}
+
+  #list{grid-area:list; background:var(--panel); border-right:1px solid var(--line); overflow-y:auto; padding:10px}
+  #search{width:100%; background:var(--bg); color:var(--ink); border:1px solid var(--line); border-radius:6px;
+    padding:7px 9px; margin-bottom:8px; font-size:12px}
+  .grp{margin:10px 0 4px; font-size:10.5px; text-transform:uppercase; letter-spacing:.6px; color:var(--dim);
+    display:flex; justify-content:space-between; align-items:center}
+  .grp .cnt{color:var(--dim)}
+  .pt{display:flex; align-items:center; gap:7px; padding:4px 7px; border-radius:5px; cursor:pointer;
+    font-family:ui-monospace,Consolas,monospace; font-size:12px}
+  .pt:hover{background:var(--panel2)}
+  .pt.sel{background:#19324a; outline:1px solid var(--accent)}
+  .dot{width:7px;height:7px;border-radius:50%;flex:none}
+  .dot.in{background:var(--in)} .dot.out{background:var(--out)} .dot.intern{background:var(--intern)}
+  .pt .nm{flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .pt .deg{color:var(--dim); font-size:10px}
+
+  #inspect{grid-area:inspect; overflow-y:auto; padding:16px 20px}
+  .ins-empty{color:var(--dim); margin-top:40px; text-align:center}
+  .ins-head{display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; margin-bottom:2px}
+  .ins-head .name{font-family:ui-monospace,Consolas,monospace; font-size:20px; font-weight:700}
+  .role{font-size:10.5px; text-transform:uppercase; letter-spacing:.5px; padding:2px 8px; border-radius:10px; border:1px solid}
+  .role.in{color:var(--in); border-color:#1e4d63} .role.out{color:var(--out); border-color:#6b2a4d}
+  .role.intern{color:var(--intern); border-color:#473a6b}
+  .ins-full{color:var(--dim); font-family:ui-monospace,Consolas,monospace; font-size:11px; margin-bottom:14px}
+  .sec{margin:16px 0}
+  .sec h3{font-size:11px; text-transform:uppercase; letter-spacing:.6px; margin:0 0 8px; color:var(--dim)}
+  .sec h3 .arrow{color:var(--ink)}
+  .tree{list-style:none; margin:0; padding:0}
+  .tree ul{list-style:none; margin:0 0 0 16px; padding:0; border-left:1px solid var(--line)}
+  .node{padding:3px 0}
+  .stmt{display:flex; gap:8px; align-items:flex-start; padding:5px 8px; border-radius:6px; background:var(--panel);
+    border:1px solid var(--line); margin:3px 0}
+  .stmt .ln{color:var(--accent); font-family:ui-monospace,monospace; font-size:11px; flex:none; padding-top:1px}
+  .stmt .src{font-family:ui-monospace,Consolas,monospace; font-size:11.5px; color:var(--code); white-space:pre-wrap;
+    word-break:break-word; flex:1}
+  .stmt .sect{color:var(--dim); font-size:10px}
+  .tok{cursor:pointer; border-bottom:1px dotted transparent}
+  .tok:hover{border-bottom-color:var(--accent); color:var(--accent)}
+  .toggle{cursor:pointer; color:var(--accent); font-size:11px; user-select:none; margin-left:4px}
+  .leaf-in{color:var(--in)} .leaf-out{color:var(--out)}
+  .chip{display:inline-block; font-family:ui-monospace,monospace; font-size:11px; padding:1px 6px; border-radius:4px;
+    background:var(--panel2); border:1px solid var(--line); margin:2px 3px 2px 0; cursor:pointer}
+  .chip:hover{border-color:var(--accent)}
+  .chip.in{color:var(--in)} .chip.out{color:var(--out)} .chip.intern{color:var(--intern)}
+
+  #flags{grid-area:flags; background:var(--panel); border-left:1px solid var(--line); overflow-y:auto; padding:12px}
+  #flags h2{font-size:11px; text-transform:uppercase; letter-spacing:.6px; color:var(--dim); margin:4px 0 10px}
+  .stat-grid{display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; margin-bottom:14px}
+  .stat{background:var(--panel2); border:1px solid var(--line); border-radius:7px; padding:8px; text-align:center}
+  .stat .n{font-size:20px; font-weight:700; font-variant-numeric:tabular-nums}
+  .stat .l{font-size:10px; text-transform:uppercase; letter-spacing:.4px; color:var(--dim)}
+  .stat.in .n{color:var(--in)} .stat.out .n{color:var(--out)} .stat.intern .n{color:var(--intern)}
+  .flag{background:var(--panel2); border:1px solid var(--line); border-left:3px solid var(--warn); border-radius:6px;
+    padding:8px 10px; margin:7px 0; cursor:pointer}
+  .flag:hover{border-color:var(--accent)}
+  .flag.bad{border-left-color:var(--bad)} .flag.ok{border-left-color:var(--ok)} .flag.info{border-left-color:var(--accent)}
+  .flag .ft{font-weight:600; font-size:12px; display:flex; justify-content:space-between; gap:8px}
+  .flag .fd{color:var(--dim); font-size:11px; margin-top:3px}
+  .flag .badge{font-size:10px; color:var(--dim); font-variant-numeric:tabular-nums}
+  .mode-flow{font-family:ui-monospace,monospace; font-size:11px; line-height:1.7}
+  .mode-flow .br{color:var(--dim)} .mode-flow .tgt{color:var(--accent); cursor:pointer}
+  .mode-flow .cond{color:var(--code)}
+  .modal{position:fixed; inset:0; background:rgba(0,0,0,.6); display:none; align-items:center; justify-content:center; z-index:10}
+  .modal.show{display:flex}
+  .modal .box{background:var(--panel); border:1px solid var(--line); border-radius:10px; width:min(820px,92vw); height:80vh;
+    display:flex; flex-direction:column; padding:14px}
+  .modal textarea{flex:1; width:100%; background:#0c1118; color:#cfe3ff; border:1px solid var(--line); border-radius:6px;
+    font:12px/1.5 ui-monospace,Consolas,monospace; padding:10px; resize:none; white-space:pre; overflow:auto}
+  .modal .row{display:flex; gap:8px; justify-content:flex-end; margin-top:10px}
+  mark{background:#3a2f12; color:#fde68a; border-radius:3px}
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="gho">Ghost</span>Map <span class="sub">· reverse-engineer a building from its control program</span></h1>
+  <span class="file">panel <b id="panelName">—</b></span>
+  <button class="btn" id="srcBtn">View source</button>
+  <button class="btn primary" id="pasteBtn">Paste PPCL…</button>
+</header>
+
+<div id="list">
+  <input id="search" placeholder="Filter points…  (e.g. CCV, fan, damper)" autocomplete="off">
+  <div id="pointGroups"></div>
+</div>
+
+<div id="inspect">
+  <div class="ins-empty" id="insEmpty">
+    <div style="font-size:15px;color:var(--ink)">Click a point to trace what drives it and what it affects.</div>
+    <div style="margin-top:8px">Try <b style="color:var(--accent);cursor:pointer" onclick="selectPoint(prefixed('MAD'))">MAD</b>
+      (mixed-air damper) or <b style="color:var(--accent);cursor:pointer" onclick="selectPoint(prefixed('CCV'))">CCV</b>
+      (cooling-coil valve).</div>
+  </div>
+  <div id="insBody" style="display:none"></div>
+</div>
+
+<div id="flags">
+  <h2>Forensic summary</h2>
+  <div class="stat-grid" id="statGrid"></div>
+  <h2>Control flow · operating modes</h2>
+  <div class="mode-flow" id="modeFlow"></div>
+  <h2 style="margin-top:14px">Findings</h2>
+  <div id="flagList"></div>
+</div>
+
+<div class="modal" id="modal">
+  <div class="box">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <b id="modalTitle">Paste a PPCL export</b>
+      <button class="btn" onclick="closeModal()">✕</button>
+    </div>
+    <textarea id="modalText" spellcheck="false"></textarea>
+    <div class="row">
+      <span id="modalHint" style="margin-right:auto;color:var(--dim);font-size:11px"></span>
+      <button class="btn" onclick="closeModal()">Cancel</button>
+      <button class="btn primary" id="modalLoad">Analyze</button>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ===========================================================================
+   GhostMap — deterministic static analysis of a Siemens PPCL control program.
+   It does NOT execute or edit logic. It parses the program into points and
+   statements, builds a reads/writes dependency graph + control-flow graph,
+   and answers: what DRIVES this point, what does it DRIVE, and where are the
+   gaps (orphans, dead code, overrides). The graph is plain parsing — verifiable
+   against the source on screen, no LLM, no guessing.
+   ========================================================================= */
+
+/* ---- the real panel program (Gainesville Clinical Lab, AHU-65) ---- */
+const SAMPLE_PROGRAM = String.raw`00010	C GVL.B1.AHU65
+00028	C * Siemens  JOB: Gainesville Clinical Lab  44OP-327180
+00048	C * SYSTEM NAME: GVL.B1.AHU65
+00100	DEFINE(X,"GVL.B1.AHU65.")
+00120	LOCAL(OAFALM)
+00695	C   -- CREATE AND RESET GLOBAL TIMERS --
+00697	C     - SUPPLY FAN RAMP -
+00700	IF("GVL.B1.AHU65.SF1.STS" .NE. ON .OR. "GVL.B1.AHU65.SF1.SS" .EQ. OFF) THEN "GVL.B1.AHU65.SVC1" = 0
+00710	SAMPLE(2) IF("GVL.B1.AHU65.SVC1" .LT. 1000) THEN "GVL.B1.AHU65.SVC1" = "GVL.B1.AHU65.SVC1" + 2
+00720	IF("GVL.B1.AHU65.SF2.STS" .NE. ON .OR. "GVL.B1.AHU65.SF2.SS" .EQ. OFF) THEN "GVL.B1.AHU65.SVC2" = 0
+00730	SAMPLE(2) IF("GVL.B1.AHU65.SVC2" .LT. 1000) THEN "GVL.B1.AHU65.SVC2" = "GVL.B1.AHU65.SVC2" + 2
+00740	IF("GVL.B1.AHU65.SF3.STS" .NE. ON .OR. "GVL.B1.AHU65.SF3.SS" .EQ. OFF) THEN "GVL.B1.AHU65.SVC3" = 0
+00750	SAMPLE(2) IF("GVL.B1.AHU65.SVC3" .LT. 1000) THEN "GVL.B1.AHU65.SVC3" = "GVL.B1.AHU65.SVC3" + 2
+00752	IF("GVL.B1.AHU65.SF4.STS" .NE. ON .OR. "GVL.B1.AHU65.SF4.SS" .EQ. OFF) THEN "GVL.B1.AHU65.SVC4" = 0
+00754	SAMPLE(2) IF("GVL.B1.AHU65.SVC4" .LT. 1000) THEN "GVL.B1.AHU65.SVC4" = "GVL.B1.AHU65.SVC4" + 2
+01117	C ----- CREATE A VIRTUAL FAN STATUS -----
+01120	IF("GVL.B1.AHU65.SF1.STS" .OR. "GVL.B1.AHU65.SF2.STS" .OR. "GVL.B1.AHU65.SF3.STS" .OR. "GVL.B1.AHU65.SF4.STS") THEN ON("GVL.B1.AHU65.SFR") ELSE OFF("GVL.B1.AHU65.SFR")
+01998	C     - CALCULATE VARIABLE OA DAMPER RAMP TIME FROM OA TEMP -
+02000	SAMPLE(2) TABLE("GVL.B1.AHU65.OAT","GVL.B1.AHU65.OAR",0,300,48,30)
+02010	SAMPLE(2) IF("GVL.B1.AHU65.MRP" .LT. 1000) THEN "GVL.B1.AHU65.MRP" = "GVL.B1.AHU65.MRP" + 2
+02058	C     - EVERYTIME THE ZONE MODE CHANGES, RESET THE DAMPER RAMP -
+02060	IF("GVL.B1.AHU65.SFR" .EQ. OFF .OR. "GVL.B1.AHU65.OCC" .NE. $LOC11) THEN "GVL.B1.AHU65.MRP" = 0
+02070	$LOC11 = "GVL.B1.AHU65.OCC"
+02587	C ----- Dry Bulb ECONOMIZER CHANGE OVER -----
+02600	IF("GVL.B1.AHU65.OAT" .GE. "GVL.B1.AHU65.SAT.SP") THEN OFF("GVL.B1.AHU65.ECM")
+02605	IF("GVL.B1.AHU65.OAT" .LT. "GVL.B1.AHU65.SAT.SP" - 1) THEN ON("GVL.B1.AHU65.ECM")
+02687	C ----- DEHUMIDIFY CHANGE OVER -----
+02700	MAX("GVL.B1.AHU65.SPC.HUM.MAX","GVL.B1.AHU65.SPC.HUM1","GVL.B1.AHU65.SPC.HUM2")
+02710	IF("GVL.B1.AHU65.SPC.HUM.MAX" .GT. "GVL.B1.AHU65.DEHUM.ON") THEN ON("GVL.B1.AHU65.DEHUM")
+02720	IF("GVL.B1.AHU65.SPC.HUM.MAX" .GT. "GVL.B1.AHU65.DEHUM.ON") THEN SECND7 = 0
+02725	SAMPLE(1) SECND7 = SECND7 + 1
+02730	IF("GVL.B1.AHU65.SPC.HUM.MAX" .LT. "GVL.B1.AHU65.DEHUM.OFF" .AND. SECND7 .GT. 1200) THEN OFF("GVL.B1.AHU65.DEHUM")
+03187	C ----- AIRFLOW CALCULATIONS -----
+03200	SAMPLE(10) "GVL.B1.AHU65.SF1.CFM" = SQRT("GVL.B1.AHU65.SF1.VP") * 4005 * 0.349 * 1.0 * "GVL.B1.AHU65.SF1.SS"
+03210	SAMPLE(10) "GVL.B1.AHU65.SF2.CFM" = SQRT("GVL.B1.AHU65.SF2.VP") * 4005 * 0.349 * 1.0 * "GVL.B1.AHU65.SF2.SS"
+03220	SAMPLE(10) "GVL.B1.AHU65.SF3.CFM" = SQRT("GVL.B1.AHU65.SF3.VP") * 4005 * 0.349 * 1.0 * "GVL.B1.AHU65.SF3.SS"
+03230	SAMPLE(10) "GVL.B1.AHU65.SF4.CFM" = SQRT("GVL.B1.AHU65.SF4.VP") * 4005 * 0.349 * 1.0 * "GVL.B1.AHU65.SF4.SS"
+03250	"GVL.B1.AHU65.SA.CFM" = "GVL.B1.AHU65.SF1.CFM" + "GVL.B1.AHU65.SF2.CFM" + "GVL.B1.AHU65.SF3.CFM" + "GVL.B1.AHU65.SF4.CFM"
+03260	"GVL.B1.AHU65.OA.CFM" = "GVL.B1.AHU65.AFMS"
+03272	SAMPLE(2) "$OAFALM" = "$OAFALM" + 2
+03280	IF("GVL.B1.AHU65.OA.CFM" .LT. "GVL.B1.AHU65.OA.CFM.SP" * 1.1 .AND. "GVL.B1.AHU65.OA.CFM" .GT. "GVL.B1.AHU65.OA.CFM.SP" * 0.9) THEN "$OAFALM" = 0
+03290	IF("GVL.B1.AHU65.SVC1" .LT. 300) THEN "$OAFALM" = 0
+03300	IF("$OAFALM" .GT. 120) THEN ON("GVL.B1.AHU65.OA.CFM.ALM") ELSE OFF("GVL.B1.AHU65.OA.CFM.ALM")
+03479	C ----- DECISION TREE -------
+03500	IF("GVL.B1.AHU65.SSD" .EQ. ON) THEN GOTO 20000
+03540	IF("GVL.B1.AHU65.LTD" .EQ. ON) THEN GOTO 22000
+03550	IF("GVL.B1.AHU65.SHSP" .EQ. ON) THEN GOTO 22000
+03650	IF("GVL.B1.AHU65.OCC" .EQ. 1) THEN GOTO 6000
+03750	GOTO 4000
+03892	C ----- Occupied MODE (2) -----
+04000	ON("GVL.B1.AHU65.SF1.SS")
+04010	ON("GVL.B1.AHU65.SF2.SS")
+04020	ON("GVL.B1.AHU65.SF3.SS")
+04030	ON("GVL.B1.AHU65.SF4.SS")
+04050	LOOP(0,"GVL.B1.AHU65.SAT","GVL.B1.AHU65.VRT","GVL.B1.AHU65.SAT.SP","GVL.B1.AHU65.SAT.PG","GVL.B1.AHU65.SAT.IG",0,1,50,0,100,0)
+04070	TABLE("GVL.B1.AHU65.VRT","GVL.B1.AHU65.PHV",0,100,33,0)
+04090	TABLE("GVL.B1.AHU65.VRT","GVL.B1.AHU65.MAE",33,"GVL.B1.AHU65.MAM",66,100)
+04100	TABLE("GVL.B1.AHU65.MRP","GVL.B1.AHU65.MAR",30,0,"GVL.B1.AHU65.OAR",100)
+04120	LOOP(0,"GVL.B1.AHU65.OA.CFM","GVL.B1.AHU65.MAM","GVL.B1.AHU65.OA.CFM.SP","GVL.B1.AHU65.OAF.PG","GVL.B1.AHU65.OAF.IG",0,1,10,0,100,0)
+04130	LOOP(0,"GVL.B1.AHU65.MAT","GVL.B1.AHU65.MAL","GVL.B1.AHU65.MLT.SP","GVL.B1.AHU65.MAT.PG","GVL.B1.AHU65.MAT.IG",0,1,50,"GVL.B1.AHU65.MAM",100,0)
+04140	IF("GVL.B1.AHU65.ECM" .EQ. ON) THEN MIN("GVL.B1.AHU65.MAD","GVL.B1.AHU65.MAE","GVL.B1.AHU65.MAR","GVL.B1.AHU65.MAL") ELSE "GVL.B1.AHU65.MAD" = "GVL.B1.AHU65.MAM"
+04150	TABLE("GVL.B1.AHU65.MAD","GVL.B1.AHU65.OAD",0,0,50,100)
+04160	TABLE("GVL.B1.AHU65.MAD","GVL.B1.AHU65.RAD",50,100,100,0)
+04180	IF("%X%SPC.HUM.MAX" .LT. "%X%DEHUM.ON") THEN TABLE("%X%VRT","%X%CCV",68,0,100,100)
+04190	IF("%X%SPC.HUM.MAX" .GE. "%X%DEHUM.ON") THEN SET(100.0,"%X%CCV")
+04210	GOTO 32000
+05892	C ----- Un-Occupied MODE (1) -----
+06000	OFF("GVL.B1.AHU65.SF1.SS")
+06010	OFF("GVL.B1.AHU65.SF2.SS")
+06020	OFF("GVL.B1.AHU65.SF3.SS")
+06030	OFF("GVL.B1.AHU65.SF4.SS")
+06230	LOOP(128,"GVL.B1.AHU65.HCT","GVL.B1.AHU65.PHV","GVL.B1.AHU65.HCT.SP","GVL.B1.AHU65.PHV.PG","GVL.B1.AHU65.PHV.IG",0,1,51,0,100,0)
+06550	SET(0,"GVL.B1.AHU65.OAD")
+06560	SET(100,"GVL.B1.AHU65.RAD")
+06660	SET(0,"GVL.B1.AHU65.CCV")
+07890	GOTO 32000
+19892	C ----- Life Safety -----
+20000	OFF("GVL.B1.AHU65.SF1.SS")
+20010	OFF("GVL.B1.AHU65.SF2.SS")
+20020	OFF("GVL.B1.AHU65.SF3.SS")
+20030	OFF("GVL.B1.AHU65.SF4.SS")
+20230	LOOP(128,"GVL.B1.AHU65.HCT","GVL.B1.AHU65.PHV","GVL.B1.AHU65.HCT.SP","GVL.B1.AHU65.PHV.PG","GVL.B1.AHU65.PHV.IG",0,1,51,0,100,0)
+20550	SET(0,"GVL.B1.AHU65.OAD")
+20560	SET(100,"GVL.B1.AHU65.RAD")
+20660	SET(0,"GVL.B1.AHU65.CCV")
+21890	GOTO 32000
+21892	C ----- Mechanical Safety -----
+22000	OFF("GVL.B1.AHU65.SF1.SS")
+22010	OFF("GVL.B1.AHU65.SF2.SS")
+22020	OFF("GVL.B1.AHU65.SF3.SS")
+22030	OFF("GVL.B1.AHU65.SF4.SS")
+22230	IF("GVL.B1.AHU65.LTD" .EQ. ON) THEN SET(100,"GVL.B1.AHU65.PHV") ELSE SET(0,"GVL.B1.AHU65.PHV")
+22550	SET(0,"GVL.B1.AHU65.OAD")
+22560	SET(100,"GVL.B1.AHU65.RAD")
+22660	SET(25,"GVL.B1.AHU65.CCV")
+23890	GOTO 32000
+31800	C ----- MODULATE THE SUPPLY FAN TO MAINTAIN STATIC PRESSURE -----
+32000	LOOP(128,"GVL.B1.AHU65.SSP","GVL.B1.AHU65.SVL","GVL.B1.AHU65.SSP.SP","GVL.B1.AHU65.SSP.PG","GVL.B1.AHU65.SSP.IG",0,1,50,"GVL.B1.AHU65.SVM",100,0)
+32050	TABLE("GVL.B1.AHU65.SVC1","GVL.B1.AHU65.SVR1",0,"GVL.B1.AHU65.SVM",180,100)
+32060	IF("GVL.B1.AHU65.SF1.SS" .EQ. PRFON) THEN MIN("GVL.B1.AHU65.SF1.SVD","GVL.B1.AHU65.SVL","GVL.B1.AHU65.SVR1") ELSE SET(0,"GVL.B1.AHU65.SF1.SVD")
+32070	TABLE("GVL.B1.AHU65.SVC2","GVL.B1.AHU65.SVR2",0,"GVL.B1.AHU65.SVM",180,100)
+32080	IF("GVL.B1.AHU65.SF2.SS" .EQ. PRFON) THEN MIN("GVL.B1.AHU65.SF2.SVD","GVL.B1.AHU65.SVL","GVL.B1.AHU65.SVR2") ELSE SET(0,"GVL.B1.AHU65.SF2.SVD")
+32090	TABLE("GVL.B1.AHU65.SVC3","GVL.B1.AHU65.SVR3",0,"GVL.B1.AHU65.SVM",180,100)
+32100	IF("GVL.B1.AHU65.SF3.SS" .EQ. PRFON) THEN MIN("GVL.B1.AHU65.SF3.SVD","GVL.B1.AHU65.SVL","GVL.B1.AHU65.SVR3") ELSE SET(0,"GVL.B1.AHU65.SF3.SVD")
+32110	TABLE("GVL.B1.AHU65.SVC4","GVL.B1.AHU65.SVR4",0,"GVL.B1.AHU65.SVM",180,100)
+32120	IF("GVL.B1.AHU65.SF4.SS" .EQ. PRFON) THEN MIN("GVL.B1.AHU65.SF4.SVD","GVL.B1.AHU65.SVL","GVL.B1.AHU65.SVR4") ELSE SET(0,"GVL.B1.AHU65.SF4.SVD")
+32700	GOTO 100`;
+
+/* =================== PARSER =================== */
+let macros={};               // DEFINE name -> value (e.g. X -> "GVL.B1.AHU65.")
+let prefix='';               // the dominant point-name prefix, for short display names
+const KEYWORDS=new Set(['ON','OFF','PRFON','AUTO','FAST','SLOW','HAND','ALARM','DAY','NIGHT']);
+
+function normName(s){ return s.replace(/%([A-Za-z0-9_]+)%/g,(m,k)=>macros[k]!==undefined?macros[k]:m); }
+// every point referenced in a fragment: quoted "..." names + bare $locals + SECNDn
+function pointsIn(frag){
+  const out=[]; let m;
+  const q=/"([^"]*)"/g; while(m=q.exec(frag)){ const n=normName(m[1]); if(n) out.push(n); }
+  const d=/(^|[^"\w.])(\$[A-Za-z0-9_.]+|SECND[0-7S])\b/g; while(m=d.exec(frag)){ out.push(m[2]); }
+  return out;
+}
+function quotedPts(frag){ const out=[]; let m; const q=/"([^"]*)"/g;
+  while(m=q.exec(frag)){ const n=normName(m[1]); if(n)out.push(n); } return out; }
+function splitArgs(s){ const out=[]; let d=0,inq=false,cur='';
+  for(const c of s){ if(c==='"')inq=!inq; if(!inq){ if(c==='(')d++; if(c===')')d--;
+    if(c===','&&d===0){ out.push(cur); cur=''; continue; } } cur+=c; }
+  if(cur.trim()!=='')out.push(cur); return out; }
+function findElse(s){ // index of top-level " ELSE " (outside parens/quotes)
+  let d=0,inq=false; const U=s.toUpperCase();
+  for(let i=0;i<s.length;i++){ const c=s[i]; if(c==='"')inq=!inq;
+    if(!inq){ if(c==='(')d++; if(c===')')d--;
+      if(d===0 && U.startsWith(' ELSE ',i)) return i; } }
+  return -1;
+}
+
+// classify ONE executable statement (SAMPLE prefix already stripped) -> {kind,reads,writes,goto}
+function classifyExec(text){
+  text=text.trim(); const up=text.toUpperCase();
+  let m;
+  if((m=text.match(/^GOTO\s+(\d+)/i))) return {kind:'goto', reads:[], writes:[], goto:+m[1]};
+  if((m=text.match(/^(ON|OFF)\s*\((.*)\)\s*$/i))){
+    const pts=splitArgs(m[2]).flatMap(quotedPts); return {kind:m[1].toLowerCase(), reads:[], writes:pts}; }
+  if((m=text.match(/^SET\s*\((.*)\)\s*$/i))){
+    let a=splitArgs(m[1]).filter(x=>!x.trim().startsWith('@')); const val=a.shift()||'';
+    const pts=a.flatMap(quotedPts); return {kind:'set', reads:pointsIn(val), writes:pts}; }
+  if((m=text.match(/^LOOP\s*\((.*)\)\s*$/i))){
+    const qp=splitArgs(m[1]).flatMap(quotedPts); // PV=qp[0], OUT=qp[1], rest read
+    return {kind:'loop', writes:qp[1]?[qp[1]]:[], reads:qp.filter((p,i)=>i!==1)}; }
+  if((m=text.match(/^TABLE\s*\((.*)\)\s*$/i))){
+    const qp=splitArgs(m[1]).flatMap(quotedPts); // IN=qp[0], OUT=qp[1]
+    return {kind:'table', writes:qp[1]?[qp[1]]:[], reads:qp.filter((p,i)=>i!==1)}; }
+  if((m=text.match(/^(MAX|MIN)\s*\((.*)\)\s*$/i))){
+    const qp=splitArgs(m[2]).flatMap(quotedPts); // OUT=qp[0], rest read
+    return {kind:m[1].toLowerCase(), writes:qp[0]?[qp[0]]:[], reads:qp.slice(1)}; }
+  if(up.startsWith('LOCAL')||up.startsWith('DEFINE')) return {kind:'decl', reads:[], writes:[]};
+  // assignment:  LHS = RHS   (LHS before first top-level '=')
+  const eq=topEq(text);
+  if(eq>=0){ const lhs=pointsIn(text.slice(0,eq)); const rhs=pointsIn(text.slice(eq+1));
+    if(lhs.length) return {kind:'assign', writes:[lhs[0]], reads:rhs}; }
+  return {kind:'other', reads:pointsIn(text), writes:[]};
+}
+function topEq(s){ let d=0,inq=false; for(let i=0;i<s.length;i++){ const c=s[i];
+  if(c==='"')inq=!inq; if(!inq){ if(c==='(')d++; if(c===')')d--;
+    if(c==='='&&d===0 && s[i-1]!=='.'&&s[i+1]!=='.'&&'<>!'.indexOf(s[i-1])<0) return i; } } return -1; }
+
+// parse a full logical statement (may contain IF/THEN/ELSE) -> node with merged reads/writes + branch targets
+function parseStmt(text){
+  let sample=null, m;
+  if((m=text.match(/^SAMPLE\s*\(\s*(\d+)\s*\)\s*(.*)$/i))){ sample=+m[1]; text=m[2]; }
+  text=text.trim();
+  if((m=text.match(/^IF\s*\((.*)\)\s*THEN\s+([\s\S]*)$/i))){
+    const cond=m[1]; let rest=m[2]; const ei=findElse(rest);
+    let thenT=rest, elseT=null; if(ei>=0){ thenT=rest.slice(0,ei); elseT=rest.slice(ei+6); }
+    const t=classifyExec(thenT), e=elseT?classifyExec(elseT):null;
+    const reads=uniq([...pointsIn(cond), ...t.reads, ...(e?e.reads:[])]);
+    const writes=uniq([...t.writes, ...(e?e.writes:[])]);
+    const gotos=[]; if(t.goto!=null)gotos.push(t.goto); if(e&&e.goto!=null)gotos.push(e.goto);
+    return {kind:'if', sample, cond, reads, writes, gotos, branches:[t,e].filter(Boolean), cond_goto:true};
+  }
+  const x=classifyExec(text); x.sample=sample;
+  x.gotos = x.goto!=null?[x.goto]:[]; x.uncondGoto = x.kind==='goto';
+  return x;
+}
+function uniq(a){ return [...new Set(a)]; }
+
+/* =================== MODEL =================== */
+let prog=[];      // executable statements: {ln, raw, node, section}
+let comments=[];  // {ln, text}
+let lineMap={};   // ln -> index in prog
+let points=new Map(); // name -> {name, writes:[lnIdx], reads:[lnIdx]}
+let sections=[];  // {ln, label}
+
+function P(name){ if(!points.has(name)) points.set(name,{name, writes:[], reads:[]}); return points.get(name); }
+
+function analyze(src){
+  macros={}; prog=[]; comments=[]; lineMap={}; points=new Map(); sections=[]; prefix='';
+  const rawLines=[];
+  src.split(/\r?\n/).forEach(line=>{
+    const m=line.match(/^\s*(\d+)[\t ]+([\s\S]*)$/); if(!m) return;
+    rawLines.push({ln:+m[1], text:m[2].replace(/\s+$/,'')});
+  });
+  // first pass: DEFINE macros
+  rawLines.forEach(L=>{ const m=L.text.match(/^DEFINE\s*\(\s*([A-Za-z0-9_]+)\s*,\s*"([^"]*)"\s*\)/i);
+    if(m) macros[m[1]]=m[2]; });
+  prefix = macros['X'] || guessPrefix(rawLines);
+  // second pass: classify
+  let curSection='(top)';
+  rawLines.forEach(L=>{
+    const t=L.text.trim();
+    if(/^C\b/.test(t)||t==='C'){ // comment
+      const sm=t.match(/^C\s*-+\s*(.+?)\s*-+\s*$/);
+      if(sm){ curSection=sm[1]; sections.push({ln:L.ln, label:sm[1]}); }
+      comments.push({ln:L.ln, text:t.replace(/^C\s?/,'')}); return;
+    }
+    const node=parseStmt(L.text);
+    if(node.kind==='decl') return;
+    const idx=prog.length;
+    prog.push({ln:L.ln, raw:t, node, section:curSection});
+    lineMap[L.ln]=idx;
+    node.writes.forEach(p=>{ if(!KEYWORDS.has(p)) P(p).writes.push(idx); });
+    node.reads.forEach(p=>{ if(!KEYWORDS.has(p)) P(p).reads.push(idx); });
+  });
+  computeReachability();
+}
+function guessPrefix(lines){ // longest common dotted prefix of quoted names
+  const names=[]; lines.forEach(L=>{ let m,q=/"([^"]*)"/g; while(m=q.exec(L.text)){ if(m[1].includes('.'))names.push(m[1]); } });
+  if(!names.length) return '';
+  let pre=names[0];
+  names.forEach(n=>{ while(pre && !n.startsWith(pre)) pre=pre.slice(0,-1); });
+  const cut=pre.lastIndexOf('.'); return cut>=0?pre.slice(0,cut+1):'';
+}
+let reachable=new Set();
+function computeReachability(){
+  reachable=new Set();
+  if(!prog.length) return;
+  const visit=[0]; // entry = first executable statement
+  while(visit.length){
+    const i=visit.pop(); if(i==null||reachable.has(i)||i>=prog.length) continue; reachable.add(i);
+    const n=prog[i].node;
+    if(n.uncondGoto){ const t=lineMap[n.gotos[0]]; if(t!=null)visit.push(t); continue; }
+    // conditional gotos branch out AND fall through
+    n.gotos.forEach(g=>{ const t=lineMap[g]; if(t!=null)visit.push(t); });
+    if(i+1<prog.length) visit.push(i+1); // fall-through
+  }
+}
+
+/* =================== CLASSIFICATION =================== */
+function roleOf(name){ const p=points.get(name); if(!p) return 'intern';
+  const w=p.writes.length, r=p.reads.length;
+  if(w===0 && r>0) return 'in';
+  if(r===0 && w>0) return 'out';
+  return 'intern';
+}
+function disp(name){ return name.startsWith(prefix)?name.slice(prefix.length):name; }
+function prefixed(short){ // best-effort: find a point whose short name matches
+  for(const n of points.keys()) if(disp(n)===short) return n; return prefix+short; }
+
+/* =================== RENDER: point list =================== */
+const $=id=>document.getElementById(id);
+let selected=null;
+function renderList(filter=''){
+  const f=filter.trim().toUpperCase();
+  const groups={in:[],intern:[],out:[]};
+  [...points.keys()].forEach(n=>{ if(KEYWORDS.has(n))return; groups[roleOf(n)].push(n); });
+  const order=[['in','Inputs (sensors · setpoints · status)'],['intern','Internal (computed · timers)'],['out','Outputs (commands · alarms)']];
+  let html='';
+  order.forEach(([k,label])=>{
+    let arr=groups[k].sort((a,b)=>disp(a).localeCompare(disp(b)));
+    if(f) arr=arr.filter(n=>disp(n).toUpperCase().includes(f));
+    html+=`<div class="grp"><span>${label}</span><span class="cnt">${arr.length}</span></div>`;
+    arr.forEach(n=>{ const p=points.get(n);
+      html+=`<div class="pt ${selected===n?'sel':''}" data-pt="${esc(n)}">
+        <span class="dot ${k}"></span><span class="nm">${esc(disp(n))}</span>
+        <span class="deg">${p.writes.length}w·${p.reads.length}r</span></div>`; });
+  });
+  $('pointGroups').innerHTML=html;
+  $('pointGroups').querySelectorAll('.pt').forEach(el=>el.onclick=()=>selectPoint(el.dataset.pt));
+}
+
+/* =================== RENDER: inspector =================== */
+function stmtHTML(idx, highlight){
+  const s=prog[idx]; const src=highlightTokens(s.raw, highlight);
+  return `<div class="stmt"><span class="ln">${pad(s.ln)}</span>
+    <span class="src">${src}</span></div>
+    <div class="sect" style="margin:-2px 0 4px 54px;color:var(--dim);font-size:10px">in: ${esc(s.section)}</div>`;
+}
+function highlightTokens(raw, focus){
+  // make every point name in the line clickable; bold the focus point
+  let html=esc(raw);
+  const names=uniq([...prog.filter(()=>0)]); // noop
+  // collect points on this line
+  return html.replace(/&quot;([^&]*?)&quot;/g, (m,inner)=>{
+    const norm=normName(inner.replace(/%([A-Za-z0-9_]+)%/g,'%$1%'));
+    const full=normName(inner);
+    const cls = full===focus?'tok sel-tok':'tok';
+    const col = focusColor(full);
+    return `&quot;<span class="${cls}" style="${full===focus?'color:var(--accent);font-weight:700':col}" onclick="selectPoint('${esc(full)}')">${esc(inner)}</span>&quot;`;
+  });
+}
+function focusColor(name){ const r=roleOf(name); return r==='in'?'color:var(--in)':r==='out'?'color:var(--out)':'color:var(--code)'; }
+
+function driverTree(name, dir, depth, seen){
+  // dir: 'up' (drivers/reads-of-writers) or 'down' (consumers/writes-of-readers)
+  const p=points.get(name); if(!p) return '';
+  const stmtIdxs = dir==='up' ? p.writes : p.reads;
+  if(!stmtIdxs.length){
+    const r=roleOf(name);
+    const tag = dir==='up' ? (r==='in'?'external input — not written by this program':'(no driver)')
+                           : (r==='out'?'terminal output — not read by this program':'(not used downstream)');
+    return `<li class="node"><span class="leaf-${r==='in'?'in':r==='out'?'out':''}">${esc(disp(name))}</span>
+      <span style="color:var(--dim);font-size:11px"> — ${tag}</span></li>`;
+  }
+  let html='';
+  stmtIdxs.forEach(idx=>{
+    const s=prog[idx]; const others = dir==='up' ? s.node.reads : s.node.writes;
+    const kids = uniq(others).filter(o=>!KEYWORDS.has(o) && o!==name);
+    const canExpand = depth>0 && kids.length>0;
+    const id='t'+(treeSeq++);
+    html+=`<li class="node">${stmtHTML(idx, name)}`;
+    if(canExpand){
+      html+=`<span class="toggle" onclick="toggleNode('${id}')">▸ ${dir==='up'?'driven by':'feeds'} ${kids.length} point${kids.length>1?'s':''}</span>`;
+      html+=`<ul id="${id}" style="display:none">`;
+      kids.forEach(k=>{ if(seen.has(k)){ html+=`<li class="node"><span class="tok" onclick="selectPoint('${esc(k)}')">${esc(disp(k))}</span> <span style="color:var(--dim);font-size:11px">↺ (cycle)</span></li>`; }
+        else { const s2=new Set(seen); s2.add(k); html+=`<ul style="border:none;margin-left:0"><li class="node" style="list-style:none">`+
+          `<b class="tok ${roleOf(k)}" onclick="selectPoint('${esc(k)}')" style="${focusColor(k)}">${esc(disp(k))}</b>`+
+          `<ul>${driverTree(k,dir,depth-1,s2)}</ul></li></ul>`; } });
+      html+=`</ul>`;
+    }
+    html+=`</li>`;
+  });
+  return html;
+}
+let treeSeq=0;
+function toggleNode(id){ const e=$(id); if(e) e.style.display = e.style.display==='none'?'':'none'; }
+
+function selectPoint(name){
+  if(!points.has(name)){ // maybe a short name
+    const full=prefixed(name); if(points.has(full)) name=full; else return; }
+  selected=name; treeSeq=0;
+  const p=points.get(name); const r=roleOf(name);
+  $('insEmpty').style.display='none'; $('insBody').style.display='';
+  const appears=uniq([...p.writes,...p.reads]).sort((a,b)=>prog[a].ln-prog[b].ln);
+  $('insBody').innerHTML =
+    `<div class="ins-head"><span class="name">${esc(disp(name))}</span>
+      <span class="role ${r}">${r==='in'?'input':r==='out'?'output':'internal'}</span>
+      <span style="color:var(--dim);font-size:12px">${p.writes.length} writer(s) · ${p.reads.length} reader(s)</span></div>
+     <div class="ins-full">${esc(name)}</div>
+     <div class="sec"><h3><span class="arrow">▲</span> Driven by <span style="color:var(--dim)">— what changes this point</span></h3>
+       <ul class="tree">${driverTree(name,'up',5,new Set([name]))}</ul></div>
+     <div class="sec"><h3><span class="arrow">▼</span> Drives <span style="color:var(--dim)">— what this point affects</span></h3>
+       <ul class="tree">${driverTree(name,'down',5,new Set([name]))}</ul></div>
+     <div class="sec"><h3>Appears in ${appears.length} line(s)</h3>
+       ${appears.map(i=>stmtHTML(i,name)).join('')}</div>`;
+  renderList($('search').value);
+}
+
+/* =================== RENDER: flags + modes =================== */
+function renderFlags(){
+  const all=[...points.keys()].filter(n=>!KEYWORDS.has(n));
+  const ins=all.filter(n=>roleOf(n)==='in'), outs=all.filter(n=>roleOf(n)==='out'), inter=all.filter(n=>roleOf(n)==='intern');
+  $('statGrid').innerHTML =
+    `<div class="stat in"><div class="n">${ins.length}</div><div class="l">Inputs</div></div>
+     <div class="stat intern"><div class="n">${inter.length}</div><div class="l">Internal</div></div>
+     <div class="stat out"><div class="n">${outs.length}</div><div class="l">Outputs</div></div>`;
+
+  // mode flow from the decision tree (statements containing GOTO)
+  const branches=prog.filter(s=>s.node.gotos.length);
+  let mf='';
+  branches.forEach(s=>{
+    s.node.gotos.forEach(g=>{
+      const tgtIdx=resolveIdx(g); const tgtSect=tgtIdx!=null?prog[tgtIdx].section:'?';
+      const cond = s.node.kind==='if' ? `<span class="cond">if ${esc(shortCond(s.node.cond))}</span> → ` : 'GOTO → ';
+      mf+=`<div><span class="br">${pad(s.ln)}</span> ${cond}<span class="tgt" onclick="jumpLine(${g})">${pad(g)} ${esc(tgtSect)}</span></div>`;
+    });
+  });
+  $('modeFlow').innerHTML = mf || '<span style="color:var(--dim)">no branching</span>';
+
+  // findings
+  const flags=[];
+  // 1. modulating outputs hard-overridden (LOOP/TABLE controlled AND SET to a constant)
+  all.forEach(n=>{ const p=points.get(n); if(p.writes.length<2)return;
+    const kinds=new Set(p.writes.map(i=>prog[i].node.kind));
+    const modul = kinds.has('loop')||kinds.has('table');
+    const setc = p.writes.some(i=>prog[i].node.kind==='set');
+    if(modul && setc){ const setLines=p.writes.filter(i=>prog[i].node.kind==='set');
+      flags.push({cls:'warn', t:`${disp(n)} — modulated, then hard-set`, badge:p.writes.length+' writers',
+        d:`Controlled by a LOOP/TABLE but also forced to a fixed value in ${setLines.length} place(s) (mode overrides). Verify the override priority is intentional.`,
+        pt:n}); } });
+  // 2. multi-driver points (causal hotspots)
+  const multi=all.map(n=>points.get(n)).filter(p=>p.writes.length>=3).sort((a,b)=>b.writes.length-a.writes.length);
+  multi.slice(0,4).forEach(p=>flags.push({cls:'info', t:`${disp(p.name)} — ${p.writes.length} drivers`,
+    badge:'hotspot', d:`Written from ${p.writes.length} different statements across modes. Click to see every driver.`, pt:p.name}));
+  // 3. unreachable / dead code
+  const dead=prog.map((s,i)=>i).filter(i=>!reachable.has(i));
+  if(dead.length) flags.push({cls:'bad', t:`${dead.length} unreachable statement(s)`, badge:'dead code',
+    d:`Lines never reachable from program entry: ${dead.slice(0,6).map(i=>pad(prog[i].ln)).join(', ')}${dead.length>6?'…':''}`, line:prog[dead[0]].ln});
+  else flags.push({cls:'ok', t:`No unreachable code`, badge:'clean', d:`Every statement is reachable from the program entry through the control flow.`});
+  // 4. outputs commanded with no status feedback referenced (interlock heuristic)
+  // a started point X.SS whose matching X.STS is never read => missing proof
+  const started=all.filter(n=>/\.SS$/.test(n) && points.get(n).writes.some(i=>['on','off'].includes(prog[i].node.kind)));
+  const noProof=started.filter(n=>{ const sts=n.replace(/\.SS$/,'.STS'); return !points.has(sts) || points.get(sts).reads.length===0; });
+  if(noProof.length) flags.push({cls:'warn', t:`${noProof.length} command(s) with no status feedback`, badge:'interlock',
+    d:`Commanded but matching .STS never checked: ${noProof.map(disp).slice(0,4).join(', ')}`, pt:noProof[0]});
+
+  $('flagList').innerHTML = flags.map(f=>
+    `<div class="flag ${f.cls}" ${f.pt?`onclick="selectPoint('${esc(f.pt)}')"`:f.line?`onclick="jumpLine(${f.line})"`:''}>
+      <div class="ft"><span>${esc(f.t)}</span><span class="badge">${f.badge||''}</span></div>
+      <div class="fd">${esc(f.d)}</div></div>`).join('');
+}
+function shortCond(c){ c=c.replace(/"[^"]*\.([A-Za-z0-9_.]+)"/g,'$1').replace(/%X%/g,''); return c.length>46?c.slice(0,44)+'…':c; }
+function resolveIdx(ln){ if(lineMap[ln]!=null) return lineMap[ln];
+  for(let i=0;i<prog.length;i++) if(prog[i].ln>=ln) return i; return null; }
+function jumpLine(ln){ const idx=resolveIdx(ln); if(idx==null)return; openSource();
+  setTimeout(()=>{ const el=$('srcLine_'+ln); if(el){ el.scrollIntoView({block:'center'}); el.style.background='#3a2f12'; } },50); }
+
+/* =================== source view =================== */
+function openSource(){
+  $('modalTitle').textContent='Program source — '+(macros['X']||'panel');
+  $('modalHint').textContent=`${prog.length} statements · ${points.size} points`;
+  const t=$('modalText'); t.readOnly=true;
+  t.value = SAMPLE_PROGRAM_CURRENT;
+  $('modalLoad').style.display='none';
+  $('modal').classList.add('show');
+}
+function openPaste(){
+  $('modalTitle').textContent='Paste a PPCL export';
+  $('modalHint').textContent='Line-numbered PPCL text (e.g. an APOGEE / PXC panel export)';
+  const t=$('modalText'); t.readOnly=false; t.value=''; t.placeholder='00010  C ...\n00100  ...';
+  $('modalLoad').style.display=''; $('modal').classList.add('show'); t.focus();
+}
+function closeModal(){ $('modal').classList.remove('show'); }
+$('modalLoad').onclick=()=>{ const txt=$('modalText').value.trim(); if(txt){ loadProgram(txt); } closeModal(); };
+$('srcBtn').onclick=openSource; $('pasteBtn').onclick=openPaste;
+
+/* =================== boot =================== */
+let SAMPLE_PROGRAM_CURRENT=SAMPLE_PROGRAM;
+function loadProgram(src){
+  SAMPLE_PROGRAM_CURRENT=src; analyze(src);
+  $('panelName').textContent = macros['X'] ? macros['X'].replace(/\.$/,'') : 'unknown';
+  selected=null; $('insEmpty').style.display=''; $('insBody').style.display='none';
+  renderList(); renderFlags();
+}
+$('search').addEventListener('input',e=>renderList(e.target.value));
+function esc(s){ return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+function pad(n){ return String(n).padStart(5,'0'); }
+
+loadProgram(SAMPLE_PROGRAM);
+
+// test/debug accessor (function declaration → reachable from page.evaluate)
+function __state(){ return {prog, points, reachable, lineMap, KEYWORDS, roleOf, prefixed, disp}; }
+</script>
+</body>
+</html>
